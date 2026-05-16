@@ -1,0 +1,125 @@
+[
+  {
+    "name": "서울 실업급여 종료 임박 청년",
+    "profile": {
+      "age": 27,
+      "region": "서울",
+      "household_size": 1,
+      "employment_status": "unemployed",
+      "monthly_income": 0,
+      "expected_monthly_income": 800000,
+      "expected_income_start_month": 3,
+      "rent": 550000,
+      "deposit": 5000000,
+      "unemployment_benefit_receiving": true,
+      "unemployment_benefit_days_left": 45,
+      "credit_score": 690,
+      "wants_job_training": true
+    }
+  },
+  {
+    "name": "경기 파트타임 저소득 청년",
+    "profile": {
+      "age": 24,
+      "region": "경기",
+      "household_size": 1,
+      "employment_status": "part_time",
+      "monthly_income": 900000,
+      "expected_monthly_income": 1400000,
+      "expected_income_start_month": 6,
+      "rent": 450000,
+      "credit_score": 720,
+      "wants_job_training": true
+    }
+  },
+  {
+    "name": "의료비 부담이 큰 프리랜서",
+    "profile": {
+      "age": 32,
+      "region": "부산",
+      "household_size": 1,
+      "employment_status": "freelancer",
+      "monthly_income": 1200000,
+      "expected_monthly_income": 1600000,
+      "expected_income_start_month": 6,
+      "rent": 500000,
+      "medical_expense_3m": 900000,
+      "credit_score": 760,
+      "debt_monthly_payment": 200000
+    }
+  },
+  {
+    "name": "고소득 사회초년생",
+    "profile": {
+      "age": 29,
+      "region": "서울",
+      "household_size": 1,
+      "employment_status": "employed",
+      "monthly_income": 3500000,
+      "expected_monthly_income": 3600000,
+      "expected_income_start_month": 12,
+      "rent": 700000,
+      "credit_score": 820,
+      "wants_job_training": false
+    }
+  },
+  {
+    "name": "위기상황 저신용 청년",
+    "profile": {
+      "age": 30,
+      "region": "대전",
+      "household_size": 1,
+      "employment_status": "job_seeker",
+      "monthly_income": 200000,
+      "rent": 400000,
+      "crisis_event": true,
+      "credit_score": 620,
+      "debt_monthly_payment": 350000,
+      "is_near_poverty": true,
+      "wants_job_training": true
+    }
+  },
+  {
+    "name": "기초생활 수급 청년",
+    "profile": {
+      "age": 23,
+      "region": "광주",
+      "household_size": 1,
+      "employment_status": "unemployed",
+      "monthly_income": 0,
+      "rent": 300000,
+      "is_basic_livelihood": true,
+      "income_percent_median": 35,
+      "crisis_event": false,
+      "wants_job_training": true
+    }
+  },
+  {
+    "name": "전북 농촌 구직 청년",
+    "profile": {
+      "age": 26,
+      "region": "전북",
+      "household_size": 1,
+      "employment_status": "job_seeker",
+      "monthly_income": 0,
+      "expected_monthly_income": 1000000,
+      "expected_income_start_month": 3,
+      "rent": 250000,
+      "credit_score": 710,
+      "wants_job_training": true
+    }
+  },
+  {
+    "name": "저소득 재직 청년",
+    "profile": {
+      "age": 31,
+      "region": "인천",
+      "household_size": 1,
+      "employment_status": "employed",
+      "monthly_income": 1800000,
+      "rent": 600000,
+      "credit_score": 750,
+      "wants_job_training": true
+    }
+  }
+]

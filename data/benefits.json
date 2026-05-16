@@ -1,0 +1,459 @@
+[
+  {
+    "id": "national_youth_rent",
+    "name": "청년월세 한시 특별지원(데모)",
+    "domain": "주거",
+    "estimated_monthly_value": 200000,
+    "priority": 95,
+    "description": "청년 1인가구의 월세 부담을 낮추는 중앙정부형 주거 지원 예시입니다.",
+    "target": "만 19~34세 월세 거주 청년",
+    "required_docs": ["임대차계약서", "월세 이체내역", "가족관계/주민등록 서류", "소득·재산 확인자료"],
+    "apply_url": "https://www.bokjiro.go.kr",
+    "exclusive_group": "housing_rent_support",
+    "conflicts_with": ["local_youth_rent_seoul", "housing_benefit"],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [19, 34], "label": "만 19~34세"},
+        {"field": "household_size", "op": "<=", "value": 1, "label": "청년 1인가구"},
+        {"field": "rent", "op": ">", "value": 0, "label": "월세 거주"},
+        {"field": "has_housing_contract", "op": "==", "value": true, "label": "임대차계약 확인 가능"},
+        {"field": "income_percent_median", "op": "<=", "value": 100, "label": "소득 기준 100% 이하(데모 기준)"}
+      ]
+    },
+    "warning_rule": {"field": "income_percent_median", "op": "between", "value": [90, 110], "label": "월세지원 소득 기준 근처: 소득 증가 시 탈락 가능"}
+  },
+  {
+    "id": "local_youth_rent_seoul",
+    "name": "서울 청년월세지원(데모)",
+    "domain": "주거",
+    "estimated_monthly_value": 200000,
+    "priority": 90,
+    "description": "서울 거주 청년의 월세 부담을 낮추는 지자체형 주거 지원 예시입니다.",
+    "target": "서울 거주 만 19~39세 월세 청년",
+    "required_docs": ["임대차계약서", "월세납부 증빙", "주민등록등본", "소득 확인자료"],
+    "apply_url": "https://youth.seoul.go.kr",
+    "exclusive_group": "housing_rent_support",
+    "conflicts_with": ["national_youth_rent", "housing_benefit"],
+    "rule": {
+      "all": [
+        {"field": "region", "op": "in", "value": ["서울"], "label": "서울 거주"},
+        {"field": "age", "op": "between", "value": [19, 39], "label": "만 19~39세"},
+        {"field": "rent", "op": ">", "value": 0, "label": "월세 거주"},
+        {"field": "has_housing_contract", "op": "==", "value": true, "label": "임대차계약 확인 가능"},
+        {"field": "income_percent_median", "op": "<=", "value": 150, "label": "소득 기준 150% 이하(데모 기준)"}
+      ]
+    },
+    "warning_rule": {"field": "income_percent_median", "op": "between", "value": [135, 165], "label": "서울 월세지원 소득 기준 근처"}
+  },
+  {
+    "id": "housing_benefit",
+    "name": "주거급여(데모)",
+    "domain": "주거",
+    "estimated_monthly_value": 250000,
+    "priority": 98,
+    "description": "저소득 임차가구의 임차료 부담을 줄이는 주거급여 예시입니다.",
+    "target": "소득인정액 기준 이하 임차가구",
+    "required_docs": ["임대차계약서", "소득·재산 신고서", "금융정보 제공 동의서"],
+    "apply_url": "https://www.bokjiro.go.kr",
+    "exclusive_group": "housing_rent_support",
+    "conflicts_with": ["national_youth_rent", "local_youth_rent_seoul"],
+    "rule": {
+      "all": [
+        {"field": "rent", "op": ">", "value": 0, "label": "임차 거주"},
+        {"field": "income_percent_median", "op": "<=", "value": 48, "label": "주거급여 소득 기준 이하(데모 기준)"}
+      ]
+    },
+    "warning_rule": {"field": "income_percent_median", "op": "between", "value": [43, 53], "label": "주거급여 기준 근처: 소득 증가 시 복지 절벽 가능"}
+  },
+  {
+    "id": "unemployment_benefit",
+    "name": "실업급여 수급 상태(전환 기준)",
+    "domain": "고용",
+    "estimated_monthly_value": 900000,
+    "priority": 100,
+    "description": "현재 실업급여를 받고 있는 상태를 모델링하기 위한 전환 기준 항목입니다.",
+    "target": "실업급여 수급 중인 구직자",
+    "required_docs": ["수급자격 인정내역", "구직활동 자료"],
+    "apply_url": "https://www.work24.go.kr",
+    "exclusive_group": "job_income_replacement",
+    "conflicts_with": ["kua_type1", "kua_type2", "seoul_youth_allowance"],
+    "rule": {
+      "all": [
+        {"field": "unemployment_benefit_receiving", "op": "==", "value": true, "label": "실업급여 수급 중"},
+        {"field": "unemployment_benefit_days_left", "op": ">", "value": 0, "label": "잔여 수급일 존재"}
+      ]
+    },
+    "warning_rule": {"field": "unemployment_benefit_days_left", "op": "<=", "value": 45, "label": "실업급여 종료 임박: 취업지원 전환 준비 필요"}
+  },
+  {
+    "id": "kua_type1",
+    "name": "국민취업지원제도 I유형(데모)",
+    "domain": "고용",
+    "estimated_monthly_value": 500000,
+    "priority": 88,
+    "description": "저소득 구직자에게 구직촉진수당과 취업지원서비스를 제공하는 제도 예시입니다.",
+    "target": "저소득 구직자",
+    "required_docs": ["구직신청", "가구원·소득·재산 자료", "취업활동계획"],
+    "apply_url": "https://www.kua.go.kr",
+    "exclusive_group": "job_income_replacement",
+    "conflicts_with": ["unemployment_benefit", "kua_type2", "seoul_youth_allowance"],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [15, 69], "label": "만 15~69세"},
+        {"field": "employment_status", "op": "in", "value": ["unemployed", "job_seeker"], "label": "구직 상태"},
+        {"field": "income_percent_median", "op": "<=", "value": 60, "label": "저소득 기준 이하(데모 기준)"},
+        {"field": "unemployment_benefit_receiving", "op": "==", "value": false, "label": "실업급여 수급 중 아님"}
+      ]
+    },
+    "warning_rule": {"field": "income_percent_median", "op": "between", "value": [54, 66], "label": "I유형 소득 기준 근처"}
+  },
+  {
+    "id": "kua_type2",
+    "name": "국민취업지원제도 II유형(데모)",
+    "domain": "고용",
+    "estimated_monthly_value": 284000,
+    "priority": 86,
+    "description": "청년·중장년 등에게 취업활동 비용과 취업지원서비스를 제공하는 제도 예시입니다.",
+    "target": "청년 구직자 또는 취업취약계층",
+    "required_docs": ["구직신청", "취업활동계획", "실업급여 종료 확인자료(해당 시)"],
+    "apply_url": "https://www.kua.go.kr",
+    "exclusive_group": "job_income_replacement",
+    "conflicts_with": ["unemployment_benefit", "kua_type1", "seoul_youth_allowance"],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [18, 34], "label": "청년 연령대"},
+        {"field": "employment_status", "op": "in", "value": ["unemployed", "job_seeker"], "label": "구직 상태"},
+        {"field": "unemployment_benefit_receiving", "op": "==", "value": false, "label": "실업급여 종료 후 신청 가능"},
+        {"field": "income_percent_median", "op": "<=", "value": 120, "label": "청년 참여 가능 소득 범위(데모 기준)"}
+      ]
+    },
+    "warning_rule": {"field": "income_percent_median", "op": "between", "value": [108, 132], "label": "II유형 소득 기준 근처"}
+  },
+  {
+    "id": "seoul_youth_allowance",
+    "name": "서울 청년수당(데모)",
+    "domain": "고용",
+    "estimated_monthly_value": 500000,
+    "priority": 87,
+    "description": "서울 거주 미취업 청년의 구직·생활 안정을 지원하는 지자체형 예시입니다.",
+    "target": "서울 거주 미취업 청년",
+    "required_docs": ["최종학력 증명", "주민등록 서류", "고용보험 확인자료"],
+    "apply_url": "https://youth.seoul.go.kr",
+    "exclusive_group": "job_income_replacement",
+    "conflicts_with": ["unemployment_benefit", "kua_type1", "kua_type2"],
+    "rule": {
+      "all": [
+        {"field": "region", "op": "in", "value": ["서울"], "label": "서울 거주"},
+        {"field": "age", "op": "between", "value": [19, 34], "label": "청년 연령대"},
+        {"field": "employment_status", "op": "in", "value": ["unemployed", "job_seeker"], "label": "미취업/구직 상태"},
+        {"field": "unemployment_benefit_receiving", "op": "==", "value": false, "label": "실업급여 수급 중 아님"},
+        {"field": "income_percent_median", "op": "<=", "value": 150, "label": "소득 기준 150% 이하(데모 기준)"}
+      ]
+    },
+    "warning_rule": {"field": "income_percent_median", "op": "between", "value": [135, 165], "label": "청년수당 소득 기준 근처"}
+  },
+  {
+    "id": "tomorrow_learning_card",
+    "name": "국민내일배움카드(데모)",
+    "domain": "고용",
+    "estimated_monthly_value": 150000,
+    "priority": 70,
+    "description": "직업훈련 비용을 지원하는 고용·훈련 제도 예시입니다.",
+    "target": "구직자·재직자·자영업자 등 직업훈련 희망자",
+    "required_docs": ["신분확인", "훈련상담 자료", "고용상태 확인자료"],
+    "apply_url": "https://www.work24.go.kr",
+    "exclusive_group": null,
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [15, 75], "label": "훈련 가능 연령대"},
+        {"field": "wants_job_training", "op": "==", "value": true, "label": "직업훈련 희망"}
+      ]
+    }
+  },
+  {
+    "id": "youth_tomorrow_savings",
+    "name": "청년내일저축계좌(데모)",
+    "domain": "자산형성",
+    "estimated_monthly_value": 300000,
+    "priority": 82,
+    "description": "근로 청년의 자산형성을 지원하는 매칭형 저축 제도 예시입니다.",
+    "target": "근로소득이 있는 저소득 청년",
+    "required_docs": ["근로·사업소득 증빙", "가구소득 자료", "통장사본"],
+    "apply_url": "https://www.bokjiro.go.kr",
+    "exclusive_group": "asset_building_youth",
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [19, 34], "label": "청년 연령대"},
+        {"field": "employment_status", "op": "in", "value": ["part_time", "employed", "freelancer"], "label": "근로/사업소득 발생"},
+        {"field": "monthly_income", "op": "between", "value": [500000, 2300000], "label": "월 근로소득 범위(데모 기준)"},
+        {"field": "income_percent_median", "op": "<=", "value": 100, "label": "소득 기준 100% 이하(데모 기준)"}
+      ]
+    },
+    "warning_rule": {"field": "monthly_income", "op": "between", "value": [2100000, 2500000], "label": "청년내일저축 소득 상한 근처"}
+  },
+  {
+    "id": "youth_leap_account",
+    "name": "청년도약계좌(데모)",
+    "domain": "자산형성",
+    "estimated_monthly_value": 70000,
+    "priority": 60,
+    "description": "청년의 장기 자산형성을 돕는 금융상품형 제도 예시입니다.",
+    "target": "개인소득 기준을 충족하는 청년",
+    "required_docs": ["소득확인", "금융계좌 정보", "본인확인"],
+    "apply_url": "https://ylaccount.kinfa.or.kr",
+    "exclusive_group": "asset_building_youth",
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [19, 34], "label": "청년 연령대"},
+        {"field": "monthly_income", "op": ">", "value": 0, "label": "개인소득 존재"},
+        {"field": "monthly_income", "op": "<=", "value": 6250000, "label": "개인소득 상한 이하(데모 기준)"}
+      ]
+    }
+  },
+  {
+    "id": "work_incentive",
+    "name": "근로장려금(데모)",
+    "domain": "소득지원",
+    "estimated_monthly_value": 140000,
+    "priority": 75,
+    "description": "일하지만 소득이 낮은 가구의 근로를 장려하는 세제지원 예시입니다.",
+    "target": "저소득 근로·사업·종교인 소득 가구",
+    "required_docs": ["소득자료", "가구원 자료", "재산자료"],
+    "apply_url": "https://www.hometax.go.kr",
+    "exclusive_group": null,
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "employment_status", "op": "in", "value": ["part_time", "employed", "freelancer"], "label": "근로/사업소득 존재"},
+        {"field": "monthly_income", "op": ">", "value": 0, "label": "소득 발생"},
+        {"field": "income_percent_median", "op": "<=", "value": 120, "label": "저소득 근로가구 범위(데모 기준)"}
+      ]
+    },
+    "warning_rule": {"field": "income_percent_median", "op": "between", "value": [108, 132], "label": "근로장려금 소득 기준 근처"}
+  },
+  {
+    "id": "emergency_living_support",
+    "name": "긴급복지 생계지원(데모)",
+    "domain": "위기지원",
+    "estimated_monthly_value": 700000,
+    "priority": 99,
+    "description": "갑작스러운 위기 상황의 생계유지를 돕는 긴급복지 예시입니다.",
+    "target": "위기사유와 소득·재산 기준을 충족하는 가구",
+    "required_docs": ["위기사유 증빙", "소득·재산 자료", "통장사본"],
+    "apply_url": "https://www.bokjiro.go.kr",
+    "exclusive_group": "emergency_support",
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "crisis_event", "op": "==", "value": true, "label": "실직·질병 등 위기사유"},
+        {"field": "income_percent_median", "op": "<=", "value": 75, "label": "긴급복지 소득 기준 이하(데모 기준)"}
+      ]
+    }
+  },
+  {
+    "id": "medical_cost_support",
+    "name": "재난적 의료비/의료비 지원(데모)",
+    "domain": "보건의료",
+    "estimated_monthly_value": 300000,
+    "priority": 84,
+    "description": "소득 대비 의료비 부담이 큰 사용자를 위한 의료비 지원 예시입니다.",
+    "target": "의료비 부담이 큰 저소득 가구",
+    "required_docs": ["진료비 영수증", "진단서", "소득·재산 자료", "건강보험 납부확인"],
+    "apply_url": "https://www.nhis.or.kr",
+    "exclusive_group": "medical_support",
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "medical_expense_3m", "op": ">=", "value": 500000, "label": "최근 3개월 의료비 부담"},
+        {"field": "income_percent_median", "op": "<=", "value": 150, "label": "의료비 지원 소득 범위(데모 기준)"}
+      ]
+    }
+  },
+  {
+    "id": "health_insurance_reduction",
+    "name": "건강보험료 경감/납부유예 상담(데모)",
+    "domain": "보건의료",
+    "estimated_monthly_value": 50000,
+    "priority": 55,
+    "description": "소득 급감 또는 위기 상황에서 건강보험료 부담 완화 상담을 안내하는 예시입니다.",
+    "target": "소득이 감소한 지역가입자 또는 위기가구",
+    "required_docs": ["소득감소 증빙", "건강보험 자격확인", "납부내역"],
+    "apply_url": "https://www.nhis.or.kr",
+    "exclusive_group": null,
+    "conflicts_with": [],
+    "rule": {
+      "any": [
+        {"all": [
+          {"field": "has_recent_unemployment", "op": "==", "value": true, "label": "최근 실직/소득감소"},
+          {"field": "income_percent_median", "op": "<=", "value": 150, "label": "소득 부담 구간"}
+        ]},
+        {"field": "crisis_event", "op": "==", "value": true, "label": "위기사유 존재"}
+      ]
+    }
+  },
+  {
+    "id": "energy_voucher",
+    "name": "에너지바우처/공과금 지원 상담(데모)",
+    "domain": "생활지원",
+    "estimated_monthly_value": 80000,
+    "priority": 50,
+    "description": "에너지 취약가구의 냉난방비 부담을 줄이는 지원 예시입니다.",
+    "target": "기초생활·차상위 또는 에너지 취약가구",
+    "required_docs": ["수급/차상위 증명", "고지서", "가구원 확인자료"],
+    "apply_url": "https://www.bokjiro.go.kr",
+    "exclusive_group": null,
+    "conflicts_with": [],
+    "rule": {
+      "any": [
+        {"field": "is_basic_livelihood", "op": "==", "value": true, "label": "기초생활수급"},
+        {"field": "is_near_poverty", "op": "==", "value": true, "label": "차상위/취약계층"},
+        {"all": [
+          {"field": "income_percent_median", "op": "<=", "value": 50, "label": "저소득 구간"},
+          {"field": "crisis_event", "op": "==", "value": true, "label": "위기상황"}
+        ]}
+      ]
+    }
+  },
+  {
+    "id": "culture_pass",
+    "name": "문화누리/문화바우처 상담(데모)",
+    "domain": "문화",
+    "estimated_monthly_value": 11000,
+    "priority": 35,
+    "description": "문화 접근성을 높이는 바우처형 지원 예시입니다.",
+    "target": "기초생활·차상위 계층",
+    "required_docs": ["수급/차상위 증명", "본인확인"],
+    "apply_url": "https://www.mnuri.kr",
+    "exclusive_group": null,
+    "conflicts_with": [],
+    "rule": {
+      "any": [
+        {"field": "is_basic_livelihood", "op": "==", "value": true, "label": "기초생활수급"},
+        {"field": "is_near_poverty", "op": "==", "value": true, "label": "차상위 계층"},
+        {"field": "income_percent_median", "op": "<=", "value": 50, "label": "저소득 문화지원 후보"}
+      ]
+    }
+  },
+  {
+    "id": "gyeonggi_transport_youth",
+    "name": "경기 청년 교통비 지원(데모)",
+    "domain": "교통",
+    "estimated_monthly_value": 50000,
+    "priority": 45,
+    "description": "경기도 청년의 대중교통 부담을 줄이는 지역 지원 예시입니다.",
+    "target": "경기 거주 청년",
+    "required_docs": ["교통카드 정보", "주민등록 정보", "본인확인"],
+    "apply_url": "https://youth.gg.go.kr",
+    "exclusive_group": "transport_support",
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "region", "op": "in", "value": ["경기"], "label": "경기 거주"},
+        {"field": "age", "op": "between", "value": [19, 34], "label": "청년 연령대"}
+      ]
+    }
+  },
+  {
+    "id": "small_living_loan",
+    "name": "소액생계비대출/정책금융 상담(데모)",
+    "domain": "금융",
+    "estimated_monthly_value": 60000,
+    "priority": 65,
+    "description": "저신용·저소득 사용자의 긴급 생활자금 상담을 안내하는 정책금융 예시입니다.",
+    "target": "저신용·저소득 금융취약 청년",
+    "required_docs": ["신분확인", "소득확인", "신용상담 자료"],
+    "apply_url": "https://www.kinfa.or.kr",
+    "exclusive_group": "policy_finance",
+    "conflicts_with": ["sunshine_youth"],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [19, 39], "label": "청년/청년층 연령"},
+        {"field": "credit_score", "op": "<=", "value": 700, "label": "신용점수 취약 구간"},
+        {"field": "income_percent_median", "op": "<=", "value": 120, "label": "저소득/중저소득 구간"}
+      ]
+    }
+  },
+  {
+    "id": "sunshine_youth",
+    "name": "햇살론유스/청년 정책금융 상담(데모)",
+    "domain": "금융",
+    "estimated_monthly_value": 50000,
+    "priority": 62,
+    "description": "청년층의 금융접근성을 높이기 위한 정책금융 상담 예시입니다.",
+    "target": "취업준비생·사회초년생 청년",
+    "required_docs": ["신분확인", "재학/취업준비 또는 소득확인", "금융교육 이수자료"],
+    "apply_url": "https://www.kinfa.or.kr",
+    "exclusive_group": "policy_finance",
+    "conflicts_with": ["small_living_loan"],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [19, 34], "label": "청년 연령대"},
+        {"field": "employment_status", "op": "in", "value": ["student", "job_seeker", "unemployed", "part_time"], "label": "취업준비/사회초년생 후보"},
+        {"field": "monthly_income", "op": "<=", "value": 3500000, "label": "소득 상한 이하(데모 기준)"}
+      ]
+    }
+  },
+  {
+    "id": "local_emergency_youth",
+    "name": "지자체 긴급청년지원 상담(데모)",
+    "domain": "위기지원",
+    "estimated_monthly_value": 300000,
+    "priority": 73,
+    "description": "지역별 청년 위기지원·생활안정 제도를 찾기 위한 상담형 예시입니다.",
+    "target": "위기상황 청년 1인가구",
+    "required_docs": ["위기사유 증빙", "주민등록 서류", "소득자료"],
+    "apply_url": "https://www.gov.kr",
+    "exclusive_group": "emergency_support",
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [19, 39], "label": "청년 연령대"},
+        {"field": "household_size", "op": "<=", "value": 1, "label": "1인가구"},
+        {"field": "crisis_event", "op": "==", "value": true, "label": "위기사유 존재"},
+        {"field": "income_percent_median", "op": "<=", "value": 120, "label": "지원 필요 소득 구간"}
+      ]
+    }
+  },
+  {
+    "id": "debt_counseling",
+    "name": "채무조정·금융상담 연계(데모)",
+    "domain": "금융",
+    "estimated_monthly_value": 40000,
+    "priority": 58,
+    "description": "월 상환부담이 큰 사용자에게 채무조정·금융상담을 연계하는 예시입니다.",
+    "target": "상환부담이 높은 금융취약 사용자",
+    "required_docs": ["채무내역", "소득자료", "상환내역"],
+    "apply_url": "https://www.ccrs.or.kr",
+    "exclusive_group": null,
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "debt_monthly_payment", "op": ">=", "value": 300000, "label": "월 상환부담 존재"},
+        {"field": "income_percent_median", "op": "<=", "value": 150, "label": "상환부담 대비 소득 취약"}
+      ]
+    }
+  },
+  {
+    "id": "move_in_support",
+    "name": "청년 이사비·중개보수 지원(데모)",
+    "domain": "주거",
+    "estimated_monthly_value": 30000,
+    "priority": 40,
+    "description": "청년의 이사비·중개보수 부담 완화를 위한 지역형 지원 예시입니다.",
+    "target": "최근 전입 또는 이사 예정 청년",
+    "required_docs": ["임대차계약서", "이사비 영수증", "주민등록 서류"],
+    "apply_url": "https://www.gov.kr",
+    "exclusive_group": null,
+    "conflicts_with": [],
+    "rule": {
+      "all": [
+        {"field": "age", "op": "between", "value": [19, 39], "label": "청년 연령대"},
+        {"field": "rent", "op": ">", "value": 0, "label": "임차 거주"},
+        {"field": "income_percent_median", "op": "<=", "value": 150, "label": "중저소득 구간"}
+      ]
+    }
+  }
+]
