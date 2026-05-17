@@ -79,6 +79,11 @@ from core.v5_policy_digital_twin import simulate_policy_impact
 from core.v5_privacy_security import privacy_security_pack, check_access
 from core.v5_causal_ops import estimate_intervention_effects, quality_ops_pack
 from core.profile_parser import parse_onboarding_text
+from core.application_review import create_application_case, list_application_cases, review_application_case
+from core.auth_accounts import auth_status
+from core.notification_delivery import dispatch_pending_notifications, enqueue_notifications, list_notifications, notification_status
+from core.policy_store import evidence_links_for_benefits, list_policy_catalog, list_policy_sync_runs, policy_store_summary, sync_source_to_store
+from core.privacy_audit import audit_profile_access, privacy_audit_status, privacy_retention_plan, record_consent, redact_profile_payload
 from core.rag import explain_with_evidence
 from core.report import make_markdown_report
 from core.rule_engine import evaluate_all
@@ -97,14 +102,22 @@ EMPLOYMENT_STATUSES = ["unemployed", "job_seeker", "part_time", "employed", "fre
 
 def active_benefits() -> List[Dict[str, Any]]:
     benefits = list(BASE_BENEFITS)
+    by_id = {b["id"]: b for b in benefits}
     if st.session_state.get("use_imported_policies", True):
         try:
             imported = load_imported_benefits()
-            existing_ids = {b["id"] for b in benefits}
-            benefits.extend([b for b in imported if b["id"] not in existing_ids])
+            for benefit in imported:
+                by_id.setdefault(benefit["id"], benefit)
         except Exception as exc:  # noqa: BLE001
             st.session_state.setdefault("policy_load_warning", str(exc))
-    return benefits
+    if st.session_state.get("use_synced_policy_store", True):
+        try:
+            for benefit in list_policy_catalog(include_demo=True, limit=500):
+                # Synchronized catalog wins because it carries provenance/version data.
+                by_id[benefit["id"]] = benefit
+        except Exception as exc:  # noqa: BLE001
+            st.session_state.setdefault("policy_store_warning", str(exc))
+    return list(by_id.values())
 
 
 def inject_theme_css() -> None:
@@ -355,7 +368,7 @@ def profile_editor(profile: UserProfile) -> UserProfile:
 
 
 def render_onboarding(profile: UserProfile) -> UserProfile:
-    st.header("1. 온보딩·입력 통합")
+    st.header("1. 카카오톡 스타일 온보딩·입력 통합")
     c1, c2 = st.columns([1.1, 1.4])
     with c1:
         st.markdown("<div class='chat-row'><div class='chat-bot'>안녕하세요! 상황을 한 문장으로 말해주시면 받을 수 있는 혜택과 상실 위험을 계산해드릴게요.</div></div>", unsafe_allow_html=True)
@@ -975,10 +988,85 @@ def render_v5_security_causal_quality(profile: UserProfile) -> None:
     fields = st.multiselect("Requested fields", ["age", "region", "household_size", "monthly_income", "rent", "deposit", "credit_score", "medical_expense_3m"], default=["age", "region", "monthly_income", "rent", "deposit"], key="v5_fields")
     st.json(check_access(role, "read:assigned", purpose, fields))
 
+def render_production_ops(profile: UserProfile) -> None:
+    st.header("16. 실서비스화 운영 패널")
+    st.caption("정책 동기화, 원문 provenance, 업데이트 diff, 사용자 인증, 승인 플로우, 알림 outbox, 개인정보 감사 로그를 한 화면에서 검증합니다.")
+
+    st.subheader("A. Live Policy Catalog Store")
+    summary = policy_store_summary()
+    a1, a2, a3, a4 = st.columns(4)
+    a1.metric("Active policies", summary["active"])
+    a2.metric("Live/Cached", summary["active_live_or_cached"])
+    a3.metric("Demo", summary["active_demo"])
+    a4.metric("Review required", summary["human_review_required"])
+    render_df(pd.DataFrame(summary["by_source"]), label="Source별 정책 수", height=220)
+
+    specs = load_source_specs()
+    source_ids = [s.source_id for s in specs]
+    c1, c2, c3, c4 = st.columns([1.2, 1.4, 1, 1])
+    with c1:
+        source_id = st.selectbox("동기화 Source", source_ids, index=source_ids.index("local_city") if "local_city" in source_ids else 0, key="prod_sync_source")
+    with c2:
+        query = st.text_input("검색어/쿼리", value="", key="prod_sync_query")
+    with c3:
+        limit = st.number_input("limit", min_value=1, max_value=200, value=20, key="prod_sync_limit")
+    with c4:
+        require_live = st.toggle("Strict live", value=False, key="prod_strict_live")
+    if st.button("정책 API 동기화 + diff 저장", key="prod_sync_button"):
+        result = sync_source_to_store(source_id, query=query, limit=int(limit), require_live=require_live)
+        st.session_state.prod_last_sync = result
+        st.success(f"sync run #{result['run_id']} 저장: {result['diff_summary']}")
+    if st.session_state.get("prod_last_sync"):
+        st.json(st.session_state.prod_last_sync["diff_summary"])
+
+    rows = list_policy_catalog(include_demo=True, limit=100)
+    render_df(pd.DataFrame(rows), label="동기화 정책 catalog", height=320)
+    render_df(pd.DataFrame(list_policy_sync_runs(limit=20)), label="정책 업데이트 diff 이력", height=260)
+
+    selected_ids = [r.get("id") for r in rows[:5]]
+    evidence = evidence_links_for_benefits(selected_ids)
+    render_df(pd.DataFrame(evidence), label="사용자 케이스별 근거 문서 링크/provenance", height=250)
+
+    st.subheader("B. Auth · Human Review · Notification Outbox")
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        st.json(auth_status())
+    with s2:
+        if st.button("현재 추천 결과로 신청 case 생성", key="prod_case_create"):
+            evaluations = evaluate_all(active_benefits(), normalize_profile(profile))
+            selected = [item.__dict__ for item in optimize_benefits(evaluations).selected]
+            st.session_state.prod_case = create_application_case(profile, selected, created_by="streamlit", submit=True)
+        if st.session_state.get("prod_case"):
+            st.json({k: v for k, v in st.session_state.prod_case.items() if k not in {"profile", "selected_benefits"}})
+    with s3:
+        wf = build_application_workflow(profile, optimize_benefits(evaluate_all(active_benefits(), normalize_profile(profile))).selected)
+        planned = plan_notifications(profile, wf)
+        if st.button("알림 outbox 적재", key="prod_noti_enqueue"):
+            enqueue_notifications(planned, default_destination="in_app_inbox")
+            st.success("알림이 outbox에 적재되었습니다.")
+        if st.button("알림 dry-run dispatch", key="prod_noti_dispatch"):
+            st.json(dispatch_pending_notifications(dry_run=True))
+    render_df(pd.DataFrame(list_application_cases(limit=30)), label="신청 case/human review queue", height=260)
+    render_df(pd.DataFrame(list_notifications(status="", limit=30)), label="Notification outbox", height=260)
+
+    st.subheader("C. Privacy Audit · Consent · Redaction")
+    p1, p2 = st.columns(2)
+    with p1:
+        if st.button("현재 프로필 동의 기록", key="prod_consent"):
+            st.json(record_consent(profile.to_dict(), purpose="eligibility_screening", granted=True, scope=["age", "region", "monthly_income", "rent"]))
+        st.json(privacy_audit_status())
+    with p2:
+        if st.button("프로필 접근 감사 로그", key="prod_access_log"):
+            st.json(audit_profile_access(actor_id="streamlit", role="counselor", action="read:assigned", purpose="eligibility_screening", subject=profile.to_dict(), fields=["age", "region", "monthly_income", "rent"]))
+        st.json(redact_profile_payload(profile.to_dict(), purpose="analytics", role="auditor"))
+    render_df(pd.DataFrame(privacy_retention_plan()), label="개인정보 보존/파기 계획", height=240)
+
+
 def handle_sidebar() -> None:
     with st.sidebar:
         st.header("LifePass Control")
         st.session_state.use_imported_policies = st.toggle("외부 업로드 정책 포함", value=st.session_state.use_imported_policies)
+        st.session_state.use_synced_policy_store = st.toggle("동기화 정책 Store 포함", value=st.session_state.get("use_synced_policy_store", True))
         st.caption(f"현재 정책 수: {len(active_benefits())}개")
         sample_names = [s["name"] for s in SAMPLES]
         selected = st.selectbox("샘플 페르소나", sample_names)
@@ -1018,7 +1106,7 @@ def main() -> None:
     st.session_state.profile_warnings = warnings
     render_hero(profile)
 
-    tabs = st.tabs(["AI Agent", "온보딩/프로필", "현재 판정", "생애전환/절벽", "CSV 일괄분석", "정책 수집", "DB/신청관리", "전략·API", "운영자", "공공 API Gateway", "고급 AI/신뢰성", "v4 운영플랫폼", "v4 데이터지능", "v4 품질/API", "v5 실시간·정책트윈", "v5 보안·인과·품질"] )
+    tabs = st.tabs(["AI Agent", "온보딩/프로필", "현재 판정", "생애전환/절벽", "CSV 일괄분석", "정책 수집", "DB/신청관리", "전략·API", "운영자", "공공 API Gateway", "고급 AI/신뢰성", "v4 운영플랫폼", "v4 데이터지능", "v4 품질/API", "v5 실시간·정책트윈", "v5 보안·인과·품질", "실서비스화"] )
     with tabs[0]:
         render_agent(profile)
     with tabs[1]:
@@ -1051,6 +1139,8 @@ def main() -> None:
         render_v5_realtime_digital_twin(normalize_profile(st.session_state.profile))
     with tabs[15]:
         render_v5_security_causal_quality(normalize_profile(st.session_state.profile))
+    with tabs[16]:
+        render_production_ops(normalize_profile(st.session_state.profile))
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 try:
-    from fastapi import FastAPI, UploadFile, File
+    from fastapi import FastAPI, UploadFile, File, Header, HTTPException
 except Exception as exc:  # pragma: no cover
     raise RuntimeError("FastAPI 실행에는 `pip install fastapi uvicorn python-multipart`가 필요합니다.") from exc
 
@@ -47,19 +47,33 @@ from core.v5_policy_digital_twin import simulate_policy_impact
 from core.v5_privacy_security import privacy_security_pack, check_access
 from core.v5_causal_ops import estimate_intervention_effects, quality_ops_pack
 from core.demo_data import load_sample_profiles
+from core.auth_accounts import authenticate_user, auth_status, get_user_by_token, register_user
+from core.application_review import case_events, create_application_case, list_application_cases, review_application_case
+from core.notification_delivery import dispatch_pending_notifications, enqueue_notifications, list_notifications, notification_status
+from core.policy_store import evidence_links_for_benefits, list_policy_catalog, list_policy_sync_runs, policy_store_summary, sync_all_sources_to_store, sync_source_to_store
+from core.privacy_audit import audit_profile_access, privacy_audit_status, privacy_retention_plan, record_consent, redact_profile_payload
 
 app = FastAPI(title="LifePass AI Agent API", version="5.0.0")
 
 
 def active_benefits() -> list[dict[str, Any]]:
+    """Load base, imported and synchronized policies with source-aware de-duplication."""
     benefits = load_benefits()
+    by_id = {b.get("id"): b for b in benefits}
     try:
         imported = load_imported_benefits()
-        existing = {b["id"] for b in benefits}
-        benefits.extend([b for b in imported if b.get("id") not in existing])
+        for benefit in imported:
+            by_id.setdefault(benefit.get("id"), benefit)
     except Exception:
         pass
-    return benefits
+    try:
+        # Prefer policies synchronized through the production catalog store because
+        # they carry provenance, version hashes and demo/live flags.
+        for benefit in list_policy_catalog(include_demo=True, limit=500):
+            by_id[benefit.get("id")] = benefit
+    except Exception:
+        pass
+    return [b for b in by_id.values() if b]
 
 
 @app.get("/health")
@@ -131,6 +145,85 @@ def policies_search(q: str, top_k: int = 8) -> Dict[str, Any]:
     return {"query": q, "rows": rows, "count": len(rows)}
 
 
+@app.get("/api/v1/policies/catalog")
+def policies_catalog(include_demo: bool = True, limit: int = 200) -> Dict[str, Any]:
+    rows = list_policy_catalog(include_demo=include_demo, limit=limit)
+    return {"rows": rows, "count": len(rows), "summary": policy_store_summary()}
+
+
+@app.get("/api/v1/policies/sync-runs")
+def policies_sync_runs(limit: int = 30) -> Dict[str, Any]:
+    rows = list_policy_sync_runs(limit=limit)
+    return {"rows": rows, "count": len(rows)}
+
+
+@app.post("/api/v1/policies/sync-store")
+def policies_sync_store(payload: Dict[str, Any]) -> Dict[str, Any]:
+    source_id = str(payload.get("source_id", "local_city"))
+    query = str(payload.get("query", ""))
+    limit = int(payload.get("limit", 50))
+    require_live = payload.get("require_live")
+    deactivate_missing = bool(payload.get("deactivate_missing", False))
+    with trace_span("api.policies.sync_store", source_id=source_id, query=query):
+        return sync_source_to_store(
+            source_id,
+            query=query,
+            limit=limit,
+            require_live=None if require_live is None else bool(require_live),
+            deactivate_missing=deactivate_missing,
+        )
+
+
+@app.post("/api/v1/policies/sync-all")
+def policies_sync_all(payload: Dict[str, Any]) -> Dict[str, Any]:
+    query = str(payload.get("query", ""))
+    limit = int(payload.get("limit", 50))
+    require_live = payload.get("require_live")
+    with trace_span("api.policies.sync_all", query=query):
+        return sync_all_sources_to_store(query=query, limit=limit, require_live=None if require_live is None else bool(require_live))
+
+
+@app.post("/api/v1/policies/evidence")
+def policies_evidence(payload: Dict[str, Any]) -> Dict[str, Any]:
+    benefit_ids = payload.get("benefit_ids", [])
+    rows = evidence_links_for_benefits(benefit_ids)
+    return {"rows": rows, "count": len(rows)}
+
+
+@app.post("/api/v1/auth/register")
+def auth_register(payload: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        return register_user(
+            email=str(payload.get("email", "")),
+            password=str(payload.get("password", "")),
+            display_name=str(payload.get("display_name", "")),
+            role=str(payload.get("role", "citizen")),
+            tenant_key=str(payload.get("tenant_key", "default")),
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/auth/login")
+def auth_login(payload: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        return authenticate_user(str(payload.get("email", "")), str(payload.get("password", "")))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=401, detail="invalid_credentials") from exc
+
+
+@app.get("/api/v1/auth/me")
+def auth_me(authorization: str = Header(default="")) -> Dict[str, Any]:
+    try:
+        user = get_user_by_token(authorization)
+        return {"user": user}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/auth/status")
+def auth_status_endpoint() -> Dict[str, Any]:
+    return auth_status()
 
 
 @app.get("/api/v1/rag/status")
@@ -205,6 +298,62 @@ def application_workflow(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"workflow": wf, "notifications": plan_notifications(profile, wf)}
 
 
+@app.post("/api/v1/applications/cases")
+def applications_create_case(payload: Dict[str, Any]) -> Dict[str, Any]:
+    raw = payload.get("profile", payload)
+    profile, _ = validate_profile(UserProfile.from_dict(raw))
+    selected = payload.get("selected_benefits")
+    if not isinstance(selected, list):
+        evaluations = evaluate_all(active_benefits(), normalize_profile(profile))
+        selected = [item.__dict__ for item in optimize_benefits(evaluations).selected]
+    return create_application_case(profile, selected, created_by=str(payload.get("created_by", "api")), submit=bool(payload.get("submit", False)))
+
+
+@app.get("/api/v1/applications/cases")
+def applications_list_cases(status: str = "", limit: int = 100) -> Dict[str, Any]:
+    rows = list_application_cases(status=status, limit=limit)
+    return {"rows": rows, "count": len(rows)}
+
+
+@app.post("/api/v1/applications/cases/{case_id}/review")
+def applications_review_case(case_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        return review_application_case(
+            case_id,
+            decision=str(payload.get("decision", "approved")),
+            reviewer_email=str(payload.get("reviewer_email", "reviewer@lifepass.local")),
+            reason=str(payload.get("reason", "")),
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/applications/cases/{case_id}/events")
+def applications_case_events(case_id: int) -> Dict[str, Any]:
+    rows = case_events(case_id)
+    return {"rows": rows, "count": len(rows)}
+
+
+@app.post("/api/v1/notifications/enqueue")
+def notifications_enqueue(payload: Dict[str, Any]) -> Dict[str, Any]:
+    rows = payload.get("notifications", [])
+    if not isinstance(rows, list):
+        rows = [payload]
+    created = enqueue_notifications(rows, default_destination=str(payload.get("default_destination", "")))
+    return {"rows": created, "count": len(created), "status": notification_status()}
+
+
+@app.post("/api/v1/notifications/dispatch")
+def notifications_dispatch(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return dispatch_pending_notifications(limit=int(payload.get("limit", 20)), dry_run=bool(payload.get("dry_run", True)))
+
+
+@app.get("/api/v1/notifications")
+def notifications_list(status: str = "queued", limit: int = 100) -> Dict[str, Any]:
+    rows = list_notifications(status=status, limit=limit)
+    return {"rows": rows, "count": len(rows), "status": notification_status()}
+
+
 @app.post("/api/v1/policies/document/draft")
 def policy_document_draft(payload: Dict[str, Any]) -> Dict[str, Any]:
     text = str(payload.get("text", ""))
@@ -266,6 +415,46 @@ def privacy_pack(payload: Dict[str, Any]) -> Dict[str, Any]:
     raw = payload.get("profile", payload)
     profile, _ = validate_profile(UserProfile.from_dict(raw))
     return privacy_security_pack(normalize_profile(profile))
+
+
+@app.post("/api/v1/privacy/consent")
+def privacy_consent(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return record_consent(
+        payload.get("subject", payload.get("profile", "anonymous")),
+        purpose=str(payload.get("purpose", "eligibility_screening")),
+        granted=bool(payload.get("granted", True)),
+        scope=payload.get("scope", ["age", "region", "monthly_income", "rent"]),
+        expires_at=str(payload.get("expires_at", "")),
+    )
+
+
+@app.post("/api/v1/privacy/access-log")
+def privacy_access_log(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return audit_profile_access(
+        actor_id=str(payload.get("actor_id", "api")),
+        role=str(payload.get("role", "counselor")),
+        action=str(payload.get("action", "read:assigned")),
+        purpose=str(payload.get("purpose", "eligibility_screening")),
+        subject=payload.get("subject", payload.get("profile", "anonymous")),
+        fields=payload.get("fields", ["age", "region", "monthly_income", "rent"]),
+    )
+
+
+@app.post("/api/v1/privacy/redact")
+def privacy_redact(payload: Dict[str, Any]) -> Dict[str, Any]:
+    raw = payload.get("profile", payload)
+    return {"redacted": redact_profile_payload(dict(raw), purpose=str(payload.get("purpose", "analytics")), role=str(payload.get("role", "auditor")))}
+
+
+@app.get("/api/v1/privacy/audit-status")
+def privacy_audit_status_endpoint() -> Dict[str, Any]:
+    return privacy_audit_status()
+
+
+@app.get("/api/v1/privacy/retention-plan")
+def privacy_retention_plan_endpoint() -> Dict[str, Any]:
+    rows = privacy_retention_plan()
+    return {"rows": rows, "count": len(rows)}
 
 
 @app.post("/api/v1/causal/interventions")

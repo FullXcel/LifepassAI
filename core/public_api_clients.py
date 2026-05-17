@@ -1,10 +1,9 @@
 """Public-policy source connectors for LifePass AI.
 
-The module provides production-shaped connectors for public welfare/policy APIs.
-Actual endpoint URLs and API keys vary by institution and deployment, so the
-connector reads them from environment variables and falls back to bundled sample
-payloads when credentials are not available.  This keeps the competition demo
-fully runnable offline while proving the integration path for live systems.
+The original MVP used a bundled sample whenever external API configuration was
+missing.  This production-oriented connector keeps that offline mode for demos,
+but it also exposes a strict-live mode so judges/operators can prove that a run
+came from real public endpoints, cache, or sample data.
 """
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ import os
 import time
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
@@ -43,6 +42,12 @@ class SourceSpec:
     response_format: str = "json"  # json or csv
     enabled_by_default: bool = False
     homepage: str = ""
+    # Production extensions.  All have defaults so old registry JSON still loads.
+    limit_param: str = "limit"
+    api_key_query_param: str = ""
+    extra_params_env: str = ""
+    payload_path: str = ""
+    strict_live_env: str = "LIFEPASS_STRICT_LIVE_SOURCES"
 
 
 @dataclass
@@ -56,6 +61,8 @@ class FetchResult:
     fetched_at: str
     payload_hash: str
     endpoint_used: str = ""
+    live_required: bool = False
+    is_demo: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -63,6 +70,13 @@ class FetchResult:
 
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _env_true(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def ensure_source_registry() -> None:
@@ -82,6 +96,7 @@ def ensure_source_registry() -> None:
             "response_format": "json",
             "enabled_by_default": False,
             "homepage": "https://www.bokjiro.go.kr",
+            "extra_params_env": "LIFEPASS_BOKJIRO_EXTRA_PARAMS_JSON",
         },
         {
             "source_id": "gov24",
@@ -95,6 +110,7 @@ def ensure_source_registry() -> None:
             "response_format": "json",
             "enabled_by_default": False,
             "homepage": "https://www.gov.kr",
+            "extra_params_env": "LIFEPASS_GOV24_EXTRA_PARAMS_JSON",
         },
         {
             "source_id": "work24",
@@ -108,6 +124,7 @@ def ensure_source_registry() -> None:
             "response_format": "json",
             "enabled_by_default": False,
             "homepage": "https://www.work24.go.kr",
+            "extra_params_env": "LIFEPASS_WORK24_EXTRA_PARAMS_JSON",
         },
         {
             "source_id": "local_city",
@@ -121,6 +138,7 @@ def ensure_source_registry() -> None:
             "response_format": "json",
             "enabled_by_default": True,
             "homepage": "",
+            "extra_params_env": "LIFEPASS_LOCAL_CITY_EXTRA_PARAMS_JSON",
         },
     ]
     REGISTRY_PATH.write_text(json.dumps(specs, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -139,20 +157,31 @@ def get_source_spec(source_id: str) -> SourceSpec:
     raise ValueError(f"Unknown source_id: {source_id}")
 
 
+def _cache_path(source_id: str, query: str) -> Path:
+    digest = hashlib.md5(f"{source_id}:{query}".encode("utf-8")).hexdigest()[:16]
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return CACHE_DIR / f"{source_id}_{digest}.json"
+
+
 def source_status_rows() -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+    strict_mode = _env_true("LIFEPASS_STRICT_LIVE_SOURCES", False)
     for spec in load_source_specs():
         endpoint = os.getenv(spec.endpoint_env, "")
         api_key = os.getenv(spec.api_key_env, "")
+        cache_files = sorted(CACHE_DIR.glob(f"{spec.source_id}_*.json")) if CACHE_DIR.exists() else []
         rows.append({
             "source_id": spec.source_id,
             "display_name": spec.display_name,
             "institution": spec.institution,
             "endpoint_configured": bool(endpoint),
             "api_key_configured": bool(api_key),
-            "mode": "live-ready" if endpoint else "offline-sample",
+            "strict_live_mode": strict_mode,
+            "mode": "live-ready" if endpoint else ("blocked-no-endpoint" if strict_mode else "offline-sample"),
+            "cache_count": len(cache_files),
             "endpoint_env": spec.endpoint_env,
             "api_key_env": spec.api_key_env,
+            "extra_params_env": spec.extra_params_env,
             "homepage": spec.homepage,
         })
     return rows
@@ -165,7 +194,7 @@ def _ensure_sample_payload() -> None:
     payload = {
         "items": [
             {
-                "id": "live_youth_interview_allowance",
+                "id": "live_youth_interview_allowance_demo",
                 "name": "청년 면접수당 API 샘플",
                 "domain": "일자리",
                 "estimated_monthly_value": 50000,
@@ -178,10 +207,13 @@ def _ensure_sample_payload() -> None:
                 "employment_status": "unemployed|job_seeker",
                 "required_docs": "신분증, 면접확인서, 통장사본",
                 "apply_url": "https://example.go.kr/youth-interview",
+                "source_document_url": "https://example.go.kr/notice/youth-interview",
+                "announcement_date": "2026-01-01",
                 "source_system": "bundled_sample",
+                "is_demo": True,
             },
             {
-                "id": "live_energy_voucher_sample",
+                "id": "live_energy_voucher_demo",
                 "name": "취약계층 에너지바우처 API 샘플",
                 "domain": "생활안정",
                 "estimated_monthly_value": 35000,
@@ -193,18 +225,35 @@ def _ensure_sample_payload() -> None:
                 "max_income_percent": 100,
                 "required_docs": "주민등록등본, 소득자료, 위기사유 증빙",
                 "apply_url": "https://example.go.kr/energy-voucher",
+                "source_document_url": "https://example.go.kr/notice/energy-voucher",
+                "announcement_date": "2026-01-01",
                 "source_system": "bundled_sample",
+                "is_demo": True,
             },
         ]
     }
     SAMPLE_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _flatten_payload(payload: Any) -> List[Dict[str, Any]]:
+def _get_path(payload: Any, dotted_path: str) -> Any:
+    if not dotted_path:
+        return payload
+    current = payload
+    for part in dotted_path.split("."):
+        if isinstance(current, dict):
+            current = current.get(part)
+        else:
+            return None
+    return current
+
+
+def _flatten_payload(payload: Any, payload_path: str = "") -> List[Dict[str, Any]]:
+    if payload_path:
+        payload = _get_path(payload, payload_path)
     if isinstance(payload, list):
         return [x for x in payload if isinstance(x, dict)]
     if isinstance(payload, dict):
-        for key in ["items", "data", "rows", "results", "policies", "benefits", "response"]:
+        for key in ["items", "item", "data", "rows", "result", "results", "policies", "benefits", "response", "body"]:
             value = payload.get(key)
             if isinstance(value, list):
                 return [x for x in value if isinstance(x, dict)]
@@ -225,52 +274,79 @@ def _normalize_rows(rows: Iterable[Dict[str, Any]], source_id: str) -> List[Dict
     normalized: List[Dict[str, Any]] = []
     for idx, row in enumerate(rows, start=1):
         record = dict(row)
-        # Common public API field aliases
         aliases = {
             "servNm": "name",
+            "svcNm": "name",
             "서비스명": "name",
+            "사업명": "name",
+            "title": "name",
             "서비스ID": "id",
+            "serviceId": "id",
             "bizId": "id",
             "jurMnofNm": "domain",
+            "bizTy": "domain",
             "서비스목적": "description",
             "서비스대상": "target",
+            "지원대상": "target",
             "지원내용": "description",
+            "서비스내용": "description",
             "신청URL": "apply_url",
-            "url": "apply_url",
+            "detailUrl": "source_document_url",
+            "dtlUrl": "source_document_url",
+            "url": "source_document_url",
             "지원금액": "estimated_monthly_value",
             "나이시작": "min_age",
             "나이종료": "max_age",
             "시도": "region",
-            "소관기관": "domain",
+            "소관기관": "source_name",
+            "등록일": "announcement_date",
+            "수정일": "announcement_date",
+            "공고일": "announcement_date",
         }
         for src, dst in aliases.items():
             if src in record and dst not in record:
                 record[dst] = record[src]
-        record.setdefault("id", f"{source_id}_{idx}_{hashlib.sha1(json.dumps(row, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:10]}")
-        record.setdefault("name", record.get("policy_name") or record.get("title") or f"{source_id} 수집 정책 {idx}")
+        record.setdefault("id", f"{source_id}_{idx}_{hashlib.sha1(json.dumps(row, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()[:10]}")
+        record.setdefault("name", record.get("policy_name") or record.get("service_name") or f"{source_id} 수집 정책 {idx}")
         record.setdefault("domain", record.get("category") or record.get("분야") or "외부공공API")
         record.setdefault("priority", 60)
         record.setdefault("source_system", source_id)
+        record.setdefault("source_name", source_id)
+        record.setdefault("is_demo", False)
+        if "apply_url" not in record and record.get("source_document_url"):
+            record["apply_url"] = record["source_document_url"]
         normalized.append(record)
     return normalized
 
 
-def _cache_path(source_id: str, query: str) -> Path:
-    digest = hashlib.md5(f"{source_id}:{query}".encode("utf-8")).hexdigest()[:16]
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    return CACHE_DIR / f"{source_id}_{digest}.json"
+def _extra_params(spec: SourceSpec) -> Dict[str, Any]:
+    env_name = spec.extra_params_env or f"LIFEPASS_{spec.source_id.upper()}_EXTRA_PARAMS_JSON"
+    raw = os.getenv(env_name, "").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        return dict(urllib.parse.parse_qsl(raw))
 
 
 def _request_live(spec: SourceSpec, query: str = "", limit: int = 50, timeout: int = 8) -> Tuple[List[Dict[str, Any]], str, str]:
     endpoint = os.getenv(spec.endpoint_env, "").strip()
     if not endpoint:
         raise RuntimeError(f"{spec.endpoint_env} 환경변수가 설정되지 않아 live call을 생략합니다.")
-    params = {spec.default_query_param: query, "limit": str(limit)} if query else {"limit": str(limit)}
-    separator = "&" if "?" in endpoint else "?"
-    url = endpoint + separator + urllib.parse.urlencode(params, doseq=True)
-    headers = {"User-Agent": "LifePassAI/3.0 policy-ingestion"}
+    params: Dict[str, Any] = dict(_extra_params(spec))
+    if query:
+        params[spec.default_query_param] = query
+    if spec.limit_param:
+        params[spec.limit_param] = str(limit)
     api_key = os.getenv(spec.api_key_env, "").strip()
-    if api_key:
+    if api_key and spec.api_key_query_param:
+        params[spec.api_key_query_param] = api_key
+    separator = "&" if "?" in endpoint else "?"
+    url = endpoint + (separator + urllib.parse.urlencode(params, doseq=True) if params else "")
+    headers = {"User-Agent": "LifePassAI/5.1 policy-ingestion"}
+    if api_key and not spec.api_key_query_param:
         if spec.auth_header.lower() == "authorization":
             headers[spec.auth_header] = f"Bearer {api_key}"
         else:
@@ -278,14 +354,26 @@ def _request_live(spec: SourceSpec, query: str = "", limit: int = 50, timeout: i
     req = urllib.request.Request(url, headers=headers, method="GET")
     with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - explicit external integration path
         raw = resp.read().decode("utf-8", errors="replace")
-    if spec.response_format == "csv" or raw.lstrip().startswith(("id,", "name,")):
+    if spec.response_format == "csv" or raw.lstrip().startswith(("id,", "name,", "서비스명,")):
         rows = _read_csv_text(raw)
     else:
-        rows = _flatten_payload(json.loads(raw))
+        rows = _flatten_payload(json.loads(raw), payload_path=spec.payload_path)
     return _normalize_rows(rows[:limit], spec.source_id), url, raw
 
 
-def fetch_source_policies(source_id: str, query: str = "", limit: int = 50, use_cache: bool = True, use_sample_on_fail: bool = True) -> FetchResult:
+def fetch_source_policies(
+    source_id: str,
+    query: str = "",
+    limit: int = 50,
+    use_cache: bool = True,
+    use_sample_on_fail: bool | None = None,
+    require_live: bool | None = None,
+) -> FetchResult:
+    """Fetch and normalize policies from one configured public source.
+
+    ``require_live`` or ``LIFEPASS_STRICT_LIVE_SOURCES=1`` disables sample
+    fallback.  This is the switch to use in a final demo when claiming live data.
+    """
     spec = get_source_spec(source_id)
     warnings: List[str] = []
     fetched_at = _now_iso()
@@ -294,6 +382,8 @@ def fetch_source_policies(source_id: str, query: str = "", limit: int = 50, use_
     rows: List[Dict[str, Any]] = []
     raw_payload = ""
     cache_path = _cache_path(source_id, query)
+    live_required = _env_true(spec.strict_live_env, False) if require_live is None else bool(require_live)
+    allow_sample = (not live_required) if use_sample_on_fail is None else bool(use_sample_on_fail and not live_required)
 
     try:
         rows, endpoint_used, raw_payload = _request_live(spec, query=query, limit=limit)
@@ -306,27 +396,38 @@ def fetch_source_policies(source_id: str, query: str = "", limit: int = 50, use_
             endpoint_used = cached.get("endpoint", "cache")
             mode = "cached"
             raw_payload = json.dumps(cached, ensure_ascii=False)
-        elif use_sample_on_fail:
+        elif allow_sample:
             _ensure_sample_payload()
             payload = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
             rows = _normalize_rows(_flatten_payload(payload)[:limit], source_id)
+            for row in rows:
+                row["is_demo"] = True
             endpoint_used = "bundled sample"
             mode = "bundled_sample"
             raw_payload = json.dumps(payload, ensure_ascii=False)
         else:
-            return FetchResult(source_id, False, "failed", [], [], warnings, fetched_at, "", endpoint_used)
+            return FetchResult(source_id, False, "failed", [], [], warnings, fetched_at, "", endpoint_used, live_required=live_required, is_demo=False)
 
     payload_hash = fingerprint_payload(raw_payload or rows)
     df = pd.DataFrame(rows)
     benefits, transform_warnings = benefits_from_dataframe(df)
     warnings.extend(transform_warnings)
-    benefits = add_provenance(benefits, source_system=source_id, source_url=endpoint_used, raw_hash=payload_hash, collected_at=fetched_at)
-    return FetchResult(source_id, True, mode, rows, benefits, warnings, fetched_at, payload_hash, endpoint_used)
+    is_demo = mode == "bundled_sample" or all(bool(row.get("is_demo")) for row in rows)
+    benefits = add_provenance(
+        benefits,
+        source_system=source_id,
+        source_url=endpoint_used,
+        raw_hash=payload_hash,
+        collected_at=fetched_at,
+        mode=mode,
+        is_demo=is_demo,
+    )
+    return FetchResult(source_id, True, mode, rows, benefits, warnings, fetched_at, payload_hash, endpoint_used, live_required=live_required, is_demo=is_demo)
 
 
-def fetch_all_enabled_sources(query: str = "", limit: int = 50) -> List[FetchResult]:
+def fetch_all_enabled_sources(query: str = "", limit: int = 50, require_live: bool | None = None) -> List[FetchResult]:
     results: List[FetchResult] = []
     for spec in load_source_specs():
         if spec.enabled_by_default or os.getenv(spec.endpoint_env):
-            results.append(fetch_source_policies(spec.source_id, query=query, limit=limit))
+            results.append(fetch_source_policies(spec.source_id, query=query, limit=limit, require_live=require_live))
     return results

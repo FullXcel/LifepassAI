@@ -1,33 +1,69 @@
 # LifePass AI Agent v5.1
 
-## Policy Intelligence & Welfare Operations Platform for Youth Welfare Transitions
+## 청년 복지 절벽 방지·생애전환 의사결정 플랫폼
 
-LifePass AI Agent v5.1은 단순 복지 혜택 추천 챗봇이 아니라, **정책 데이터 수집, 시민 프로필 구조화, deterministic 자격 판정, 최적 혜택 조합, 신청 워크플로우, 생애전환/복지절벽 시뮬레이션, 정책 Digital Twin, 보안·프라이버시·감사 운영, Embedding RAG + bounded LLM 상담 설명**을 하나의 흐름으로 연결하는 AI Agent 기반 복지 운영 플랫폼이다.
+LifePass는 사용자의 현재 상황과 앞으로의 변화를 함께 보고, 받을 수 있는 복지·고용·정책금융 제도를 찾아주는 프로젝트입니다.  
+단순히 “지금 받을 수 있는 혜택 목록”만 보여주는 것이 아니라, 실업급여 종료, 소득 발생, 이사, 가구 변화처럼 시간이 지나며 달라지는 상황까지 계산합니다.
 
-복지 사각지대는 혜택이 없어서만 발생하지 않는다. 사용자가 자신의 상황에 맞는 제도를 알지 못하거나, 정책 조건이 복잡하거나, 신청 시점과 서류 준비를 놓치거나, 실업급여 종료·소득 발생·이사·가구 변화 같은 생애전환 시점에서 기존 혜택 상실과 신규 혜택 발생을 동시에 관리하지 못할 때 발생한다. LifePass는 이 문제를 **AI Agent + deterministic rule engine + conflict-aware optimizer + operational DBMS + policy digital twin + responsible AI operations**로 해결한다.
+이 프로젝트의 핵심은 다음과 같습니다.
 
-핵심 원칙은 명확하다. **LLM은 자격 여부를 임의로 판정하지 않는다.** 실제 자격 판정은 `core/rule_engine.py`의 deterministic rule engine이 수행하고, LLM은 검색된 근거와 룰엔진 결과를 바탕으로 상담 문장, 서류 안내, 정책 요약을 생성하는 bounded explanation layer로만 사용된다.
+- 사용자의 말을 구조화된 프로필로 바꿉니다.
+- 정책 조건을 코드로 판정합니다.
+- 중복되거나 같이 받을 수 없는 혜택을 정리합니다.
+- 3개월, 6개월, 12개월 뒤 자격 변화를 예측합니다.
+- 신청 순서, 준비 서류, 마감 알림까지 이어지게 만듭니다.
+- 정책 원문, 수집 시각, 변경 이력을 남길 수 있는 구조를 갖춥니다.
+
+> 중요한 원칙: LLM은 자격 여부를 마음대로 결정하지 않습니다.  
+> 실제 판정은 `core/rule_engine.py`의 규칙 기반 판정 코드가 맡고, LLM은 결과를 쉽게 설명하는 보조 역할만 합니다.
 
 ---
 
-## 1. 빠른 실행
+## 1. 이 프로젝트가 해결하려는 문제
 
-### 1.1 Docker Compose 실행 권장
+복지 사각지대는 혜택이 없어서만 생기지 않습니다. 실제로는 아래 이유 때문에 자주 발생합니다.
 
-대회 시연 및 심사 환경에서는 Streamlit, FastAPI, PostgreSQL + pgvector, Redis를 함께 실행하는 Docker Compose 모드를 권장한다.
+- 어떤 제도가 있는지 모름
+- 정책 조건이 복잡해서 내 상황에 맞는지 판단하기 어려움
+- 신청 마감일과 준비 서류를 놓침
+- 실업급여 종료, 취업, 소득 증가, 이사 같은 변화 이후에 받을 수 있는 제도가 달라짐
+- 어떤 혜택은 동시에 받을 수 없는데, 그 관계를 사용자가 직접 알기 어려움
+
+LifePass는 이 문제를 “상담 → 판정 → 조합 선택 → 미래 변화 예측 → 신청 관리” 흐름으로 해결하려는 프로젝트입니다.
+
+---
+
+## 2. 대상 사용자
+
+1차 대상은 복지·고용·정책금융 제도의 영향을 크게 받지만, 제도 이해와 신청 타이밍 관리가 어려운 사람들입니다.
+
+- 청년 1인가구
+- 실직 청년
+- 프리랜서
+- 저소득 근로자
+- 월세 부담이 큰 청년
+- 실업급여 종료를 앞둔 사용자
+
+---
+
+## 3. 실행 방법
+
+### 3.1 Docker Compose 실행
+
+대회 시연이나 전체 구조 확인에는 Docker Compose 실행을 권장합니다.
 
 ```bash
 cd lifepass
 docker compose up -d --build
 ```
 
-현재 `docker-compose.yml` 기준 접속 주소는 다음과 같다.
+기본 접속 주소는 다음과 같습니다.
 
 ```text
-Streamlit Dashboard: http://localhost:8503
-FastAPI OpenAPI Docs: http://localhost:8002/docs
-PostgreSQL + pgvector: localhost:5433
-Redis Event Queue: localhost:6380
+Streamlit 화면: http://localhost:8503
+FastAPI 문서:  http://localhost:8002/docs
+PostgreSQL:    localhost:5433
+Redis:         localhost:6380
 ```
 
 상태 확인:
@@ -41,8 +77,6 @@ docker compose ps
 ```bash
 docker compose logs -f lifepass-ui
 docker compose logs -f lifepass-api
-docker compose logs -f postgres
-docker compose logs -f redis
 ```
 
 종료:
@@ -51,15 +85,26 @@ docker compose logs -f redis
 docker compose down
 ```
 
-DB 볼륨까지 삭제:
+### 3.2 빠른 로컬 실행
+
+화면만 빠르게 보고 싶다면 다음 방식도 가능합니다.
 
 ```bash
-docker compose down -v
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-### 1.2 `.env` 설정
+이 경우 기본 주소는 보통 다음과 같습니다.
 
-두 서비스(`lifepass-ui`, `lifepass-api`) 모두 `env_file: .env`를 사용한다. 프로젝트 루트에 `.env`를 만들고 다음 값을 넣는다.
+```text
+http://localhost:8501
+```
+
+---
+
+## 4. `.env` 설정
+
+프로젝트 루트에 `.env` 파일을 만들고 아래처럼 설정합니다.
 
 ```env
 LIFEPASS_DATABASE_URL=postgresql://lifepass:lifepass@postgres:5432/lifepass
@@ -73,7 +118,6 @@ PUBLIC_POLICY_API_USE_CACHE=1
 
 LIFEPASS_EMBEDDING_PROVIDER=local_hash
 LIFEPASS_EMBEDDING_MODEL=local-hash-ko-384
-
 LIFEPASS_LLM_PROVIDER=template
 LIFEPASS_LLM_MODEL=gpt-4o-mini
 LIFEPASS_OPENAI_TIMEOUT=30
@@ -81,7 +125,7 @@ LIFEPASS_LLM_MAX_TOKENS=900
 # OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-기본 모드는 API 키 없이 동작하는 `local_hash + template` 모드다. 실제 OpenAI 기반 embedding/LLM을 사용할 때만 아래처럼 바꾼다.
+기본 설정은 API 키가 없어도 동작하는 로컬 모드입니다. 실제 OpenAI API를 사용할 때만 아래 값을 바꿉니다.
 
 ```env
 LIFEPASS_EMBEDDING_PROVIDER=openai
@@ -91,95 +135,122 @@ LIFEPASS_LLM_MODEL=gpt-4o-mini
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-> 보안 주의: 실제 API 키가 들어간 `.env`는 GitHub, 대회 제출 zip, 채팅창에 올리지 않는다.
+보안 주의:
 
-### 1.3 빠른 로컬 실행
-
-화면만 빠르게 확인할 때는 다음 방식도 가능하다.
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-이 경우 기본 Streamlit 주소는 `http://localhost:8501`이다. 단, PostgreSQL/pgvector/Redis 기반 운영 구조까지 함께 보여주려면 Docker Compose 모드가 더 적합하다.
-
-### 1.4 검증
-
-```bash
-python -m py_compile app.py api.py core/*.py cli_demo.py tests/verify_mvp.py
-python tests/verify_mvp.py
-```
-
-검증 스크립트는 정책 카탈로그, 자연어 프로필 파싱, 룰엔진, 혜택 충돌 제거, 생애전환 시뮬레이션, RAG/리포트, 신뢰성 감사, v4 운영 기능, v5 이벤트/정책트윈/보안/인과/품질 기능을 확인한다.
+- 실제 API 키가 들어간 `.env`는 GitHub에 올리면 안 됩니다.
+- 대회 제출 zip에도 `.env`를 넣지 않는 것이 안전합니다.
+- 팀원에게 공유할 때는 `.env.example`만 공유하고, 실제 키는 각자 따로 설정하게 하는 것이 좋습니다.
 
 ---
 
-## 2. 프로젝트가 해결하는 문제
+## 5. 주요 기능
 
-LifePass는 청년 1인가구, 실직 청년, 저소득 근로자, 프리랜서처럼 복지·고용·정책금융 제도의 영향을 크게 받지만 제도 이해와 신청 타이밍 관리가 어려운 사용자를 1차 타깃으로 한다.
+### 5.1 자연어 온보딩
 
-기존 복지 추천 서비스가 “현재 조건에서 받을 수 있는 혜택 목록”을 보여주는 데 그쳤다면, LifePass는 다음 질문에 답한다.
+사용자가 긴 입력폼을 처음부터 다 채우지 않아도 됩니다. 예를 들어 다음처럼 입력할 수 있습니다.
 
 ```text
-지금 받을 수 있는 제도는 무엇인가?
-실업급여가 끝나는 시점에 어떤 제도가 새로 열리는가?
-월소득이 생기면 어떤 혜택이 사라지고 어떤 제도가 가능해지는가?
-혜택끼리 중복 제한이나 충돌이 있는가?
-어떤 순서로 신청해야 총 월 환산효과가 커지는가?
-신청 마감과 서류 준비는 언제 해야 하는가?
-정책 조건이 바뀌면 사용자군과 예산에 어떤 영향이 생기는가?
+저는 서울에 사는 27세 1인가구이고, 월소득은 없고, 월세는 55만 원입니다. 실업급여는 45일 남았습니다.
+```
+
+`core/profile_parser.py`가 이 문장을 나이, 지역, 소득, 월세, 실업급여 잔여일 같은 값으로 정리합니다.
+
+### 5.2 규칙 기반 자격 판정
+
+복지 자격은 LLM이 임의로 판단하지 않습니다.  
+정책 조건은 `data/benefits.json`에 정리되어 있고, `core/rule_engine.py`가 조건을 하나씩 검사합니다.
+
+예를 들어 다음 조건을 확인합니다.
+
+- 나이가 조건에 맞는가?
+- 지역이 조건에 맞는가?
+- 월소득이 기준 이하인가?
+- 1인가구인지 아닌지?
+- 실업급여를 받고 있는지?
+
+이 방식은 같은 입력이면 항상 같은 결과가 나오기 때문에, 심사와 설명에 유리합니다.
+
+### 5.3 혜택 조합 최적화
+
+받을 수 있는 혜택이 여러 개라도 모두 동시에 받을 수 있는 것은 아닙니다.  
+`core/optimizer.py`와 `core/constraint_solver.py`는 같이 받을 수 없는 혜택을 정리하고, 실제로 신청 가능한 조합을 고릅니다.
+
+### 5.4 생애전환·복지절벽 시뮬레이션
+
+LifePass의 가장 큰 차별점입니다. 현재만 보는 것이 아니라, 앞으로의 변화까지 계산합니다.
+
+예시:
+
+- 실업급여가 45일 뒤 끝나는 경우
+- 3개월 뒤 아르바이트를 시작하는 경우
+- 월소득이 0원에서 80만 원, 140만 원으로 바뀌는 경우
+- 월세가 오르거나 이사하는 경우
+
+이때 어떤 혜택이 사라지고, 어떤 혜택이 새로 가능해지는지 보여줍니다.
+
+### 5.5 정책 수집과 변경 이력 관리
+
+실서비스화를 위해 정책 데이터의 출처와 변경 이력을 남길 수 있는 구조를 추가했습니다.
+
+- 정책 원문 링크
+- 데이터 수집 시각
+- 정책 출처
+- demo 데이터와 live 데이터 구분
+- 정책 변경 전후 diff
+- 사용자에게 보여줄 근거 문서 링크
+
+관련 파일은 다음과 같습니다.
+
+```text
+core/public_api_clients.py
+core/policy_ingestion.py
+core/policy_provenance.py
+core/policy_store.py
+```
+
+### 5.6 신청 관리와 운영자 검토
+
+추천에서 끝나는 것이 아니라, 실제 신청 흐름으로 이어지도록 설계했습니다.
+
+- 신청 case 생성
+- 제출 상태 관리
+- 운영자 검토 필요 표시
+- 승인/반려 기록
+- 검토 사유 저장
+
+관련 파일:
+
+```text
+core/application_review.py
+```
+
+### 5.7 알림 outbox
+
+마감 알림이나 상태 변경 알림을 바로 보내지 않고, 먼저 outbox에 쌓습니다.  
+실서비스에서는 이 구조에 카카오 알림톡, 이메일, SMS 등을 붙일 수 있습니다.
+
+관련 파일:
+
+```text
+core/notification_delivery.py
+```
+
+### 5.8 개인정보 동의와 접근 기록
+
+사용자의 개인정보를 누가, 어떤 목적으로, 어떤 항목까지 보았는지 기록할 수 있게 했습니다.
+
+관련 파일:
+
+```text
+core/privacy_audit.py
+core/v5_privacy_security.py
 ```
 
 ---
 
-## 3. 핵심 기능
+## 6. 화면 구성
 
-### 3.1 AI 상담형 온보딩
-
-사용자는 긴 행정 입력폼을 처음부터 작성하지 않아도 된다. 자연어 입력으로 나이, 지역, 가구원 수, 월소득, 월세, 실업급여 잔여일, 고용 상태, 예상 소득 변화 등을 입력한다. `core/profile_parser.py`가 자연어를 `UserProfile` 구조로 변환하고, 화면의 구조화 입력폼에서 다시 수정할 수 있다.
-
-### 3.2 Deterministic Eligibility Rule Engine
-
-정책 조건은 `data/benefits.json`의 JSON rule schema로 관리된다. 실제 자격 판정은 `core/rule_engine.py`가 수행하며, 각 조건은 `RuleTrace`로 남는다. 이 구조는 LLM-only 판정보다 감사 가능하고 재현 가능하다.
-
-### 3.3 Conflict-aware Benefit Optimizer
-
-`core/optimizer.py`와 `core/constraint_solver.py`는 eligible benefit 중 상호배타 조건이 있는 혜택을 제거하고, 월 환산효과와 긴급도, 신청 난이도를 고려한 최적 조합을 만든다. 단순 추천 목록이 아니라 실제 신청 가능한 조합을 제시하는 점이 차별점이다.
-
-### 3.4 생애전환 및 복지절벽 시뮬레이션
-
-`core/simulator.py`와 `core/whatif.py`는 3개월·6개월·12개월 시점의 사용자 상태를 재계산하고, 소득 변화에 따른 혜택 상실/획득을 비교한다. 실업급여 종료, 아르바이트 시작, 정규직 전환, 주거비 변화 같은 전환 이벤트를 기반으로 복지절벽 위험을 시각화한다.
-
-### 3.5 신청 워크플로우와 서류 체크리스트
-
-`core/durable_workflow.py`, `core/notifications.py`, `core/persistence.py`는 신청 태스크, 서류 체크리스트, 마감 리마인더, 신청 상태 추적을 지원한다. 추천에서 끝나지 않고 신청 완료까지 이어지는 운영형 플랫폼을 지향한다.
-
-### 3.6 정책 수집·정제·동기화
-
-`core/public_api_clients.py`, `core/policy_ingestion.py`, `core/policy_provenance.py`, `scripts/ingest_policy_feed.py`는 공공 정책 소스 registry, CSV 정책 피드, 샘플 fallback, provenance, version diff를 처리한다. 실제 공공 API 키가 없어도 심사 환경에서 정책 동기화 흐름을 재현할 수 있다.
-
-### 3.7 Embedding RAG + Bounded LLM 상담 설명
-
-`core/embedding_rag.py`, `core/rag.py`, `core/llm_assistant.py`는 정책 문서와 카탈로그에서 근거를 검색하고, 룰엔진 판정 결과와 함께 상담 답변을 만든다. 기본값은 API 키 없이 동작하는 `local_hash` embedding과 `template` LLM이며, OpenAI 설정을 추가하면 실제 embedding retrieval과 LLM 기반 설명을 사용할 수 있다.
-
-### 3.8 Event Mesh + Transactional Outbox
-
-`core/v5_event_mesh.py`는 사용자 프로필 변경, 혜택 판정 요청, 마감 위험 감지, 생애전환 신호를 event envelope로 만들고 outbox 구조를 시뮬레이션한다. 이벤트에는 routing key, schema version, trace id, idempotency key가 포함된다.
-
-### 3.9 Policy Digital Twin
-
-`core/v5_policy_digital_twin.py`는 정책 연령 기준이나 지원액이 바뀌었을 때 영향받는 사용자 수, 신규 지원 가능자, 월/연 예산 변화, 개인별 지원 변화량을 사전에 계산한다.
-
-### 3.10 Zero-Trust Security, Privacy, Causal Ops, Quality Ops
-
-`core/v5_privacy_security.py`는 purpose-based RBAC/ABAC, differential privacy aggregate release, synthetic profile generation을 제공한다. `core/v5_causal_ops.py`는 상담사 동행, 서류 체크리스트, 마감 리마인더 같은 intervention을 uplift·비용·ROI proxy 기준으로 정렬하고, data contract, model card, incident playbook을 포함한 품질 운영 패키지를 제공한다.
-
----
-
-## 4. 주요 화면 구성
-
-Streamlit 대시보드는 다음 탭으로 구성된다.
+Streamlit 화면은 여러 탭으로 구성됩니다.
 
 ```text
 AI Agent
@@ -198,219 +269,139 @@ v4 데이터지능
 v4 품질/API
 v5 실시간·정책트윈
 v5 보안·인과·품질
+실서비스화
 ```
 
 권장 시연 순서:
 
 ```text
 자연어 온보딩
-→ 현재 자격 판정·최적 조합
+→ 현재 자격 판정
+→ 최적 혜택 조합
 → 신청 서류 체크리스트
 → 생애전환/복지절벽 시뮬레이션
-→ Agent Workflow Trace
-→ Embedding RAG + bounded LLM 상담 답변
-→ Event Mesh / Transactional Outbox
-→ Policy Digital Twin
-→ Zero-Trust / Privacy / Causal Ops / Quality Ops
-→ FastAPI /docs와 Docker Compose 운영 구조
+→ 정책 근거 검색
+→ 정책 변경 영향 시뮬레이션
+→ 운영자 검토/알림/개인정보 감사 구조
+→ FastAPI 문서와 Docker Compose 구조
 ```
 
 ---
 
-## 5. 시스템 아키텍처
+## 7. 주요 소스파일 설명
 
-```text
-[Streamlit Dashboard]
-    ├─ 자연어 온보딩 / 구조화 프로필 입력 / JSON 업로드
-    ├─ CSV 일괄분석 / Smart Data Mapper
-    ├─ Agent Workflow Trace / Human Review Queue
-    ├─ 생애전환·복지절벽 시뮬레이터
-    ├─ Embedding RAG + bounded LLM 상담 설명
-    ├─ Policy Digital Twin / Impact Simulation
-    └─ Security·Privacy·Causal Ops / Quality Ops
-        ↓
-[FastAPI Backend]
-    ├─ /api/v1/analyze
-    ├─ /api/v1/batch/analyze
-    ├─ /api/v1/rag/status, /rag/search, /rag/ask
-    ├─ /api/v1/agent/workflow
-    ├─ /api/v1/portfolio/optimize
-    ├─ /api/v1/application/workflow
-    ├─ /api/v1/events/simulate
-    ├─ /api/v1/policy/digital-twin
-    ├─ /api/v1/security/access-check
-    ├─ /api/v1/privacy/pack
-    ├─ /api/v1/causal/interventions
-    └─ /api/v1/quality/ops
-        ↓
-[Core Intelligence Layer]
-    ├─ profile parser / smart mapper
-    ├─ deterministic rule engine
-    ├─ conflict-aware optimizer
-    ├─ timeline and cliff simulator
-    ├─ policy ingestion / provenance / document parser
-    ├─ RAG / embedding / bounded LLM assistant
-    ├─ event mesh / transactional outbox
-    ├─ policy digital twin
-    ├─ privacy/security pack
-    └─ causal ops / quality ops
-        ↓
-[Operational Storage]
-    ├─ PostgreSQL
-    ├─ pgvector-ready policy chunks
-    ├─ Redis-ready event queue
-    └─ local fallback artifacts
-```
+| 파일 | 쉽게 말하면 |
+|---|---|
+| `app.py` | 사용자가 보는 Streamlit 화면입니다. 입력, 결과, 시뮬레이션, 운영 기능을 탭으로 보여줍니다. |
+| `api.py` | 외부 프로그램이나 화면이 LifePass 기능을 요청할 수 있게 해주는 FastAPI 서버입니다. |
+| `cli_demo.py` | 웹 화면 없이 터미널에서 간단히 기능을 확인하는 실행 파일입니다. |
+| `core/models.py` | 사용자 정보, 혜택 판정 결과, 시나리오 결과 같은 기본 데이터 형태를 정의합니다. |
+| `core/profile_parser.py` | 사용자의 자연어 설명을 나이, 지역, 소득 같은 구조화된 값으로 바꿉니다. |
+| `core/rule_engine.py` | 정책 조건을 하나씩 검사해서 사용자가 받을 수 있는지 판단합니다. |
+| `core/optimizer.py` | 받을 수 있는 혜택 중 실제로 같이 신청하면 좋은 조합을 고릅니다. |
+| `core/constraint_solver.py` | 동시에 받을 수 없는 혜택을 걸러내는 보조 계산 파일입니다. |
+| `core/simulator.py` | 3개월, 6개월, 12개월 뒤 상황 변화를 계산합니다. |
+| `core/whatif.py` | “소득이 바뀌면?”, “실업급여가 끝나면?” 같은 가정 실험을 합니다. |
+| `core/public_api_clients.py` | 공공 정책 데이터를 가져오는 통로입니다. 실제 API가 없으면 샘플로도 실행됩니다. |
+| `core/policy_ingestion.py` | 외부에서 가져온 정책 데이터를 프로젝트가 쓰기 좋은 형태로 정리합니다. |
+| `core/policy_provenance.py` | 정책 데이터의 출처, 수집 시각, 원문 링크를 기록합니다. |
+| `core/policy_store.py` | 정책 목록과 변경 이력을 저장하고, 업데이트 전후 차이를 계산합니다. |
+| `core/embedding_rag.py` | 문서에서 질문과 관련 있는 근거를 찾는 기능입니다. |
+| `core/llm_assistant.py` | 판정 결과를 사용자가 이해하기 쉬운 상담 문장으로 바꿉니다. |
+| `core/auth_accounts.py` | 회원가입, 로그인, 권한 역할을 다루는 기본 인증 파일입니다. |
+| `core/application_review.py` | 신청 case를 만들고 운영자가 승인/반려할 수 있게 관리합니다. |
+| `core/notification_delivery.py` | 알림을 바로 보내지 않고 보낼 목록에 쌓아두는 파일입니다. |
+| `core/privacy_audit.py` | 개인정보 동의와 접근 기록을 남깁니다. |
+| `core/v5_event_mesh.py` | 사용자 상태 변화나 신청 이벤트를 일정한 형식으로 기록합니다. |
+| `core/v5_policy_digital_twin.py` | 정책 기준이 바뀌었을 때 영향받는 사용자와 예산 변화를 미리 계산합니다. |
+| `core/v5_privacy_security.py` | 권한, 마스킹, 가명 데이터 같은 보안·개인정보 보호 기능을 제공합니다. |
+| `core/v5_causal_ops.py` | 어떤 개입이 효과적일지 비교하고, 운영 품질 문서를 제공합니다. |
+| `infra/postgres/init.sql` | PostgreSQL 데이터베이스 테이블을 처음 만들 때 쓰는 SQL 파일입니다. |
+| `scripts/ingest_policy_feed.py` | CSV 정책 파일을 읽어서 정책 카탈로그로 넣는 스크립트입니다. |
+| `tests/verify_mvp.py` | 핵심 기능이 정상 동작하는지 확인하는 테스트 파일입니다. |
+| `tests/verify_production_extensions.py` | 실서비스화 추가 기능이 정상 동작하는지 확인하는 테스트 파일입니다. |
 
 ---
 
-## 6. REST API
+## 8. FastAPI 주요 주소
 
-Docker Compose 실행 후 OpenAPI 문서는 다음 주소에서 확인한다.
+Docker Compose 실행 후 아래 주소에서 API 문서를 볼 수 있습니다.
 
 ```text
 http://localhost:8002/docs
 ```
 
-대표 엔드포인트:
+대표 API:
 
-```text
-GET  /health
-GET  /api/v1/mcp/tools
-POST /api/v1/analyze
-POST /api/v1/batch/analyze
-POST /api/v1/policies/preview
-GET  /api/v1/sources
-POST /api/v1/sources/fetch
-POST /api/v1/policies/sync
-GET  /api/v1/policies/search
-GET  /api/v1/rag/status
-GET  /api/v1/rag/search
-POST /api/v1/rag/ask
-POST /api/v1/audit
-POST /api/v1/whatif
-GET  /api/v1/observability/traces
-POST /api/v1/agent/workflow
-GET  /api/v1/dbms/readiness
-POST /api/v1/portfolio/optimize
-POST /api/v1/application/workflow
-POST /api/v1/policies/document/draft
-POST /api/v1/knowledge-graph
-GET  /api/v1/evaluation/benchmark
-POST /api/v1/guardrails/validate
-POST /api/v1/events/simulate
-POST /api/v1/policy/digital-twin
-POST /api/v1/security/access-check
-POST /api/v1/privacy/pack
-POST /api/v1/causal/interventions
-GET  /api/v1/quality/ops
-```
+| API | 역할 |
+|---|---|
+| `POST /api/v1/analyze` | 한 명의 사용자에 대해 자격 판정과 혜택 조합을 계산합니다. |
+| `POST /api/v1/batch/analyze` | CSV로 여러 사용자를 한 번에 분석합니다. |
+| `POST /api/v1/rag/ask` | 정책 근거를 찾아 상담 답변을 만듭니다. |
+| `POST /api/v1/policy/digital-twin` | 정책이 바뀌었을 때 영향을 미리 계산합니다. |
+| `POST /api/v1/policies/sync-all` | 정책 데이터를 가져오고 저장합니다. |
+| `GET /api/v1/policies/sync-runs` | 정책 동기화 이력을 확인합니다. |
+| `POST /api/v1/auth/login` | 로그인 토큰을 발급합니다. |
+| `POST /api/v1/applications/cases` | 신청 case를 생성합니다. |
+| `POST /api/v1/notifications/enqueue` | 알림을 보낼 목록에 추가합니다. |
+| `POST /api/v1/privacy/consent` | 개인정보 동의 기록을 저장합니다. |
 
-분석 API 예시:
+---
+
+## 9. 검증 방법
+
+아래 명령어로 기본 문법과 핵심 기능을 확인합니다.
 
 ```bash
-curl -X POST http://localhost:8002/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"profile":{"age":27,"region":"서울","household_size":1,"monthly_income":0,"rent":550000,"unemployment_benefit_receiving":true,"unemployment_benefit_days_left":45}}'
+python -m py_compile app.py api.py core/*.py cli_demo.py tests/verify_mvp.py
+python tests/verify_mvp.py
+python tests/verify_production_extensions.py
 ```
 
-RAG 상담 API 예시:
+검증 범위:
 
-```bash
-curl -X POST http://localhost:8002/api/v1/rag/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question":"실업급여가 45일 뒤 끝나면 무엇을 준비해야 하나요?","profile":{"age":27,"region":"서울","household_size":1,"monthly_income":0,"rent":550000,"unemployment_benefit_receiving":true,"unemployment_benefit_days_left":45}}'
-```
+- 정책 카탈로그 로딩
+- 자연어 프로필 파싱
+- 룰엔진 자격 판정
+- 혜택 충돌 제거
+- 생애전환 시뮬레이션
+- RAG/상담 답변
+- 정책 수집·출처·변경 이력
+- 인증/신청 관리/알림/개인정보 감사
 
 ---
 
-## 7. DBMS 설계
+## 10. 기술 용어를 쉽게 풀어쓴 설명
 
-`infra/postgres/init.sql`은 PostgreSQL + pgvector 기반 운영 테이블을 정의한다.
-
-```text
-tenants
-profile_snapshots
-policy_catalog
-policy_chunks
-agent_runs
-agent_steps
-event_outbox
-application_workflows
-audit_logs
-```
-
-핵심 설계 포인트:
-
-```text
-policy_chunks.embedding vector(384)
-event_outbox.idempotency_key unique
-agent_steps.run_id foreign key
-application_workflows.workflow_json jsonb
-audit_logs purpose/action/decision/fields 저장
-```
-
-이 구조는 단순 파일 기반 데모가 아니라, 실제 지자체·복지기관·대학·공공서비스로 확장 가능한 운영형 저장소를 제시한다.
+| 용어 | 쉬운 설명 |
+|---|---|
+| LLM | ChatGPT 같은 큰 언어 모델입니다. 이 프로젝트에서는 설명문을 만드는 보조 역할입니다. |
+| RAG | 답을 그냥 지어내지 않고, 문서에서 근거를 찾아 답하게 하는 방식입니다. |
+| deterministic rule engine | 같은 입력이면 항상 같은 결과를 내는 규칙 기반 판정 코드입니다. |
+| optimizer | 여러 선택지 중 더 좋은 조합을 고르는 계산 로직입니다. |
+| policy digital twin | 실제 정책을 바꾸기 전에 가상으로 바꿔 보고 영향을 미리 계산하는 기능입니다. |
+| provenance | 데이터가 어디서 왔는지, 언제 가져왔는지 남기는 기록입니다. |
+| diff | 바뀌기 전과 바뀐 후의 차이입니다. |
+| outbox | 바로 보내지 않고, 나중에 처리할 작업을 쌓아두는 목록입니다. |
+| pgvector | PostgreSQL에서 문서 의미 검색을 하기 위한 확장 기능입니다. |
+| Redis | 빠른 작업 큐나 임시 저장소로 쓰는 프로그램입니다. |
 
 ---
 
-## 8. 기술 스택
+## 11. 현재 한계와 앞으로 보완할 점
 
-```text
-Frontend: Streamlit
-API: FastAPI
-DBMS: PostgreSQL
-Vector Search Ready: pgvector
-Event Queue: Redis-ready event mesh
-Data Layer: pandas, JSON policy catalog, local fallback artifacts
-Agent: deterministic tool trace + human-in-the-loop workflow
-Optimization: conflict-aware optimizer + constraint-style portfolio solver
-Policy Intelligence: public API gateway, document parser, policy version diff, policy digital twin
-RAG/LLM: local_hash embedding fallback, optional OpenAI embedding/LLM, bounded explanation layer
-Security: RBAC/ABAC, purpose-based field access, audit log
-Privacy: masking, synthetic data, differential privacy aggregate demo
-Quality: benchmark suite, guardrails, data contract, model card, incident playbook
-Deployment: Docker Compose
-```
+현재 버전은 대회 시연과 MVP 검증을 위한 구조가 잘 갖춰져 있습니다. 다만 실제 서비스로 운영하려면 아래 보완이 필요합니다.
+
+- 실제 복지로·정부24·고용24·지자체 API 키 연결
+- 정책 원문 문서 수집 자동화
+- PostgreSQL/Redis를 모든 기능에 더 깊게 연결
+- 기관별 사용자 계정과 권한 관리 고도화
+- 카카오 알림톡, 이메일, SMS 실제 발송 연결
+- 실제 신청 결과 데이터를 기반으로 추천 효과 검증
+- 운영 환경의 HTTPS, 비밀키 관리, 접근 제한 설정
 
 ---
 
-## 9. 디렉토리 구조
+## 12. 발표용 한 줄 설명
 
-```text
-app.py                         Streamlit dashboard
-api.py                         FastAPI backend
-cli_demo.py                    CLI demo entry point
-core/models.py                 UserProfile, evaluation, scenario models
-core/profile_parser.py          Natural language onboarding parser
-core/rule_engine.py             Deterministic eligibility engine
-core/optimizer.py               Conflict-aware benefit optimizer
-core/simulator.py               Timeline and welfare cliff simulator
-core/whatif.py                  Counterfactual what-if engine
-core/embedding_rag.py           Embedding retrieval and bounded RAG package
-core/llm_assistant.py           Template/OpenAI grounded counseling answer
-core/v5_event_mesh.py           Event envelope and outbox simulation
-core/v5_policy_digital_twin.py  Policy change impact simulator
-core/v5_privacy_security.py     RBAC/ABAC, DP, synthetic data
-core/v5_causal_ops.py           Intervention ranking and quality ops
-infra/postgres/init.sql         PostgreSQL + pgvector schema
-scripts/ingest_policy_feed.py   Policy feed ingestion script
-tests/verify_mvp.py             End-to-end MVP verification
-```
-
----
-
-## 10. 한계와 확장 계획
-
-본 버전은 실제 공공기관 API key 없이도 심사 환경에서 전체 파이프라인을 검증할 수 있도록 fallback sample과 local policy catalog를 포함한다. 실제 서비스화 단계에서는 다음 확장이 필요하다.
-
-```text
-복지로·정부24·고용24·지자체 공고 API의 실제 운영 키 연결
-정책 문서 embedding 생성 및 pgvector 검색 인덱스 활성화
-상담사 계정/권한/배정 로직 고도화
-실제 신청 결과 데이터를 통한 uplift model 학습
-기관별 멀티테넌트 배포와 SSO 연동
-감사 로그 보존 정책 및 개인정보 파기 정책 적용
-```
-
-이 한계는 핵심 아이디어의 결함이 아니라, 공공 API 접근권한과 운영 데이터 확보 이후의 서비스화 과제다. LifePass v5.1은 대회 심사에서 기술적 가능성과 실제 운영 구조를 동시에 보여주는 competition-ready prototype을 목표로 한다.
+LifePass는 청년의 현재 조건과 앞으로의 생애 변화를 함께 분석해, 받을 수 있는 복지 제도와 신청 순서를 근거 기반으로 안내하는 AI Agent형 복지 운영 플랫폼입니다.
