@@ -1,0 +1,54 @@
+[
+  {
+    "source_id": "bokjiro",
+    "display_name": "복지로/사회보장 정책 API",
+    "institution": "보건복지·사회보장 영역",
+    "description": "복지 서비스명, 대상, 신청조건, 서류, 신청 URL을 수집해 룰 카탈로그로 정규화하는 커넥터",
+    "endpoint_env": "LIFEPASS_BOKJIRO_ENDPOINT",
+    "api_key_env": "LIFEPASS_BOKJIRO_API_KEY",
+    "default_query_param": "q",
+    "auth_header": "Authorization",
+    "response_format": "json",
+    "enabled_by_default": false,
+    "homepage": "https://www.bokjiro.go.kr"
+  },
+  {
+    "source_id": "gov24",
+    "display_name": "정부24 보조금/민원 정책 API",
+    "institution": "행정안전·정부24 영역",
+    "description": "정부24·보조금성 정책 데이터를 정책 룰 후보로 변환하는 커넥터",
+    "endpoint_env": "LIFEPASS_GOV24_ENDPOINT",
+    "api_key_env": "LIFEPASS_GOV24_API_KEY",
+    "default_query_param": "q",
+    "auth_header": "Authorization",
+    "response_format": "json",
+    "enabled_by_default": false,
+    "homepage": "https://www.gov.kr"
+  },
+  {
+    "source_id": "work24",
+    "display_name": "고용24/직업훈련 정책 API",
+    "institution": "고용노동·직업훈련 영역",
+    "description": "구직·훈련·고용장려금 관련 공고를 수집해 일자리 혜택 룰로 변환하는 커넥터",
+    "endpoint_env": "LIFEPASS_WORK24_ENDPOINT",
+    "api_key_env": "LIFEPASS_WORK24_API_KEY",
+    "default_query_param": "q",
+    "auth_header": "Authorization",
+    "response_format": "json",
+    "enabled_by_default": false,
+    "homepage": "https://www.work24.go.kr"
+  },
+  {
+    "source_id": "local_city",
+    "display_name": "지자체 공고 CSV/JSON Gateway",
+    "institution": "광역·기초 지자체",
+    "description": "지자체 공고 크롤러·오픈데이터·수작업 CSV를 동일 스키마로 수집하는 범용 커넥터",
+    "endpoint_env": "LIFEPASS_LOCAL_CITY_ENDPOINT",
+    "api_key_env": "LIFEPASS_LOCAL_CITY_API_KEY",
+    "default_query_param": "keyword",
+    "auth_header": "Authorization",
+    "response_format": "json",
+    "enabled_by_default": true,
+    "homepage": ""
+  }
+]
