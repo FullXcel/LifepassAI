@@ -4,7 +4,7 @@ services:
     ports:
       - "8503:8501"
     env_file:
-      - .env.example
+      - .env
     environment:
       - LIFEPASS_DATABASE_URL=postgresql://lifepass:lifepass@postgres:5432/lifepass
       - LIFEPASS_REDIS_URL=redis://redis:6379/0
