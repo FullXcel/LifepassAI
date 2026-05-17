@@ -22,10 +22,10 @@ docker compose up -d --build
 실행 후 접속 주소는 다음과 같다.
 
 ```text
-Streamlit Dashboard: http://localhost:8501
-FastAPI OpenAPI Docs: http://localhost:8000/docs
-PostgreSQL + pgvector: localhost:5432
-Redis Event Queue: localhost:6379
+Streamlit Dashboard: http://localhost:8503
+FastAPI OpenAPI Docs: http://localhost:8002/docs
+PostgreSQL + pgvector: localhost:5433
+Redis Event Queue: localhost:6380
 ```
 
 상태 확인:
