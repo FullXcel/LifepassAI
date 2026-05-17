@@ -2,7 +2,7 @@ services:
   lifepass-ui:
     build: .
     ports:
-      - "8501:8501"
+      - "8503:8501"
     env_file:
       - .env.example
     environment:
@@ -21,7 +21,7 @@ services:
     build: .
     command: uvicorn api:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "8002:8000"
     env_file:
       - .env.example
     environment:
@@ -43,7 +43,7 @@ services:
       POSTGRES_USER: lifepass
       POSTGRES_PASSWORD: lifepass
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - lifepass_pgdata:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/001_lifepass_schema.sql:ro
@@ -56,7 +56,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     command: redis-server --appendonly yes
     volumes:
       - lifepass_redisdata:/data
