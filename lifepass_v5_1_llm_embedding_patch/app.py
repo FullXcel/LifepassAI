@@ -1003,7 +1003,7 @@ def handle_sidebar() -> None:
             except Exception as exc:  # noqa: BLE001
                 st.warning(f"JSON 업로드 실패: {exc}")
         st.divider()
-        st.markdown("**대상급 포인트**")
+        st.markdown("**플랫폼 핵심 포인트**")
         st.caption("Docker Compose 기반 DBMS, 이벤트 아키텍처, 정책 Digital Twin, Zero-Trust 보안, Causal Ops, 품질운영까지 한 흐름으로 시연합니다.")
 
 

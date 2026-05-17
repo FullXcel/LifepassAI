@@ -103,7 +103,7 @@ v5는 Docker Compose로 Streamlit UI, FastAPI API 서버, PostgreSQL + pgvector 
 
 ---
 
-## 3. v5에서 추가된 대상급 고급 기술
+## 3. v5에서 추가된 고급 기술
 
 ### 3.1 Event Mesh + Transactional Outbox
 
@@ -223,7 +223,7 @@ v5 실시간·정책트윈
 v5 보안·인과·품질
 ```
 
-시연에서는 모든 화면을 길게 보여줄 필요가 없다. 대상급 시연은 다음 순서가 가장 효과적이다.
+시연에서는 모든 화면을 길게 보여줄 필요가 없다. 시연은 다음 순서가 가장 효과적이다.
 
 ```text
 자연어 온보딩

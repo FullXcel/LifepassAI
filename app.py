@@ -368,7 +368,7 @@ def profile_editor(profile: UserProfile) -> UserProfile:
 
 
 def render_onboarding(profile: UserProfile) -> UserProfile:
-    st.header("1. 카카오톡 스타일 온보딩·입력 통합")
+    st.header("1.온보딩·입력 통합")
     c1, c2 = st.columns([1.1, 1.4])
     with c1:
         st.markdown("<div class='chat-row'><div class='chat-bot'>안녕하세요! 상황을 한 문장으로 말해주시면 받을 수 있는 혜택과 상실 위험을 계산해드릴게요.</div></div>", unsafe_allow_html=True)
@@ -1091,7 +1091,7 @@ def handle_sidebar() -> None:
             except Exception as exc:  # noqa: BLE001
                 st.warning(f"JSON 업로드 실패: {exc}")
         st.divider()
-        st.markdown("**대상급 포인트**")
+        st.markdown("**플랫폼 핵심 포인트**")
         st.caption("Docker Compose 기반 DBMS, 이벤트 아키텍처, 정책 Digital Twin, Zero-Trust 보안, Causal Ops, 품질운영까지 한 흐름으로 시연합니다.")
 
 
