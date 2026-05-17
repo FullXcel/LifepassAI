@@ -355,7 +355,7 @@ def profile_editor(profile: UserProfile) -> UserProfile:
 
 
 def render_onboarding(profile: UserProfile) -> UserProfile:
-    st.header("1. 카카오톡 스타일 온보딩·입력 통합")
+    st.header("1. 온보딩·입력 통합")
     c1, c2 = st.columns([1.1, 1.4])
     with c1:
         st.markdown("<div class='chat-row'><div class='chat-bot'>안녕하세요! 상황을 한 문장으로 말해주시면 받을 수 있는 혜택과 상실 위험을 계산해드릴게요.</div></div>", unsafe_allow_html=True)
