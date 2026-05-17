@@ -1,0 +1,35 @@
+{
+  "items": [
+    {
+      "id": "live_youth_interview_allowance",
+      "name": "청년 면접수당 API 샘플",
+      "domain": "일자리",
+      "estimated_monthly_value": 50000,
+      "priority": 71,
+      "description": "구직 청년의 면접 비용을 지원하는 외부 API 수집 예시",
+      "target": "만 18~39세 구직 청년",
+      "min_age": 18,
+      "max_age": 39,
+      "region": "서울|경기|인천",
+      "employment_status": "unemployed|job_seeker",
+      "required_docs": "신분증, 면접확인서, 통장사본",
+      "apply_url": "https://example.go.kr/youth-interview",
+      "source_system": "bundled_sample"
+    },
+    {
+      "id": "live_energy_voucher_sample",
+      "name": "취약계층 에너지바우처 API 샘플",
+      "domain": "생활안정",
+      "estimated_monthly_value": 35000,
+      "priority": 67,
+      "description": "취약계층 생활비 부담 완화를 위한 외부 API 수집 예시",
+      "target": "차상위 또는 위기 사유 가구",
+      "min_age": 0,
+      "max_age": 120,
+      "max_income_percent": 100,
+      "required_docs": "주민등록등본, 소득자료, 위기사유 증빙",
+      "apply_url": "https://example.go.kr/energy-voucher",
+      "source_system": "bundled_sample"
+    }
+  ]
+}

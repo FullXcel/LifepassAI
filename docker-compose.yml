@@ -1,0 +1,66 @@
+services:
+  lifepass-ui:
+    build: .
+    ports:
+      - "8503:8501"
+    env_file:
+      - .env
+    environment:
+      - LIFEPASS_DATABASE_URL=postgresql://lifepass:lifepass@postgres:5432/lifepass
+      - LIFEPASS_REDIS_URL=redis://redis:6379/0
+      - LIFEPASS_ENABLE_PGVECTOR=1
+      - LIFEPASS_TENANT_KEY=seoul-demo
+      - LIFEPASS_RUN_MODE=competition
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./data:/app/data
+
+  lifepass-api:
+    build: .
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8002:8000"
+    env_file:
+      - .env
+    environment:
+      - LIFEPASS_DATABASE_URL=postgresql://lifepass:lifepass@postgres:5432/lifepass
+      - LIFEPASS_REDIS_URL=redis://redis:6379/0
+      - LIFEPASS_ENABLE_PGVECTOR=1
+      - LIFEPASS_TENANT_KEY=seoul-demo
+      - LIFEPASS_RUN_MODE=competition
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./data:/app/data
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: lifepass
+      POSTGRES_USER: lifepass
+      POSTGRES_PASSWORD: lifepass
+    ports:
+      - "5433:5432"
+    volumes:
+      - lifepass_pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/001_lifepass_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifepass -d lifepass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - lifepass_redisdata:/data
+
+volumes:
+  lifepass_pgdata:
+  lifepass_redisdata:

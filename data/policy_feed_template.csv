@@ -1,0 +1,2 @@
+﻿id,name,domain,estimated_monthly_value,priority,min_age,max_age,region,max_income_percent,employment_status,rent_required,required_docs,apply_url,description
+city_youth_transport_demo,청년 교통비 지원(외부피드 예시),교통,60000,72,19,34,서울|경기|인천,150,unemployed|job_seeker|part_time|student,no,"주민등록등본, 소득확인자료, 교통카드 사용내역",https://example.go.kr,외부 CSV/API 피드에서 변환되는 정책 예시입니다.
